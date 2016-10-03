@@ -1,3 +1,4 @@
+!.gitignore
 !src/*.c
 !headers/*.h
 !Makefile
