@@ -129,7 +129,8 @@ void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, in
 			strcat(arg_to_list, " &");
 		}
 	
-		//Check size of history list before adding a new item
+		//Check size of history list before adding a new item. Remove oldest item in the queue
+		//when there are more than 10 items in the list
 		if(list_size > 10){
 		dequeue(ref_l1f, ref_l1r);
 		enqueue(arg_to_list, counter, ref_l1f, ref_l1r);
