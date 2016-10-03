@@ -1,4 +1,4 @@
 !.gitignore
-!src/*.c
-!headers/*.h
-!Makefile
+!Assignment1/Code/src/*.c
+!Assignment1/Code/headers/*.h
+!Assignment1/Code/Makefile
