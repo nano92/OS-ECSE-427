@@ -1,4 +1,5 @@
 !.gitignore
+Assignment/*
 !Assignment1/Code/src/Shell2.c
 !Assignment1/Code/src/Queue_linkedList.c
 !Assignment1/Code/headers/*.h
