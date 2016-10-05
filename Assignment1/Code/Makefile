@@ -1,12 +1,12 @@
 HEADERS = -I headers/
 CFLAGS = -g -Wall $(HEADERS)
 
-all: Shell2
+all: Shell
 
-Shell2: objects/Shell2.o objects/Queue_linkedList.o
+Shell: objects/Shell.o objects/Queue_linkedList.o
 	gcc $(CFLAGS) -o $@ $^ 
 
-objects/Shell2.o: src/Shell2.c 
+objects/Shell.o: src/Shell.c headers/Shell.h 
 	gcc $(CFLAGS) -c $< -o $@
 
 objects/Queue_linkedList.o: src/Queue_linkedList.c headers/Queue_linkedList.h
