@@ -3,14 +3,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <sys/stat.h> 
+#include <fcntl.h>
 #include "Shell.h"
 #include "Queue_linkedList.h"
-
-
-// This code is given for illustration purposes. You need not include or follow this
-// strictly. Feel free to writer better or bug free code. This example code block does not
-// worry about deallocating memory. You need to ensure memory is allocated and deallocated
-// properly so that your shell works without leaking memory.
 
 /*
 Linked List global variables
@@ -23,6 +19,9 @@ struct Node** ref_l1f = &list1_front;
 struct Node* list1_rear = NULL;
 struct Node** ref_l1r = &list1_rear;
 
+unsigned char isOutputRedirection;
+char *commandToRedirect[20];
+char filename[20];
 /*
 Struct used to store child process information
 */
@@ -32,7 +31,7 @@ struct process_info
 	char *str;
 };
 
-int getcmd(char *prompt, char *args[], int *background,int *args_count, char** argument)
+int getcmd(char *prompt, char *args[], int *background,int *args_count, char **argument)
 {
 	int length, i = 0;
 	char *token, *loc;
@@ -60,6 +59,12 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char** a
 		*loc = ' ';
 	} else
 	*background = 0;
+	
+	if ((loc = index(line, '>')) != NULL) {
+		isOutputRedirection = 1;
+	} else{
+		isOutputRedirection = 0;
+	}
 	
 	while ((token = strsep(&line, " \t\n")) != NULL) 
 	{
@@ -96,6 +101,12 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char** a
 			*background = 1;
 		}
 		
+		if ((loc = index(temp_arg, '>')) != NULL) {
+			isOutputRedirection = 1;
+		} else{
+			isOutputRedirection = 0;
+		}	
+		
 		while ((token = strsep(&temp_arg, " ")) != NULL) 
 		{
 			for (int j = 0; j < strlen(token); j++)
@@ -117,6 +128,10 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char** a
 	//add argument to history list
 	addHistory(args, &i, args_count, argument, background);
 
+	if(isOutputRedirection){
+		outputRedirection(args);
+	}
+	
 	return i;
 }
 
@@ -189,7 +204,19 @@ int getIndex(char* argument[]){
 	}
 	
 	return val;
-}	
+}
+
+void outputRedirection(char *args[]){
+	int i = 0;
+	//Clear command to redirect array before setting new commands
+	memset(commandToRedirect, '\0', 20);
+	
+	while(strcmp(args[i],">") != 0){
+		commandToRedirect[i] = args[i];
+		i++;
+	}
+	strcpy(filename,args[i+1]);
+}
 
 int executeCommand(char *args[], int *background, char** argument)
 {
@@ -230,6 +257,7 @@ int executeCommand(char *args[], int *background, char** argument)
 	*/
 	
 	int status;
+	int f;
 	
 	int fd[2], nbytes;
 	pipe(fd);
@@ -244,21 +272,51 @@ int executeCommand(char *args[], int *background, char** argument)
 		info_sent->str = "Child process finished\0\n";
 		
 		if(*background == 1){
+			if(isOutputRedirection){
+				close(STDOUT_FILENO);
+				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+   					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
+   					
+					perror("Cannot open output file\n"); exit(1);
+				}else{
+					
+					if(execvp(commandToRedirect[0],commandToRedirect) < 0)
+						printf("Command \"%s\" could not be executed\n", *argument); 
+						exit(-1);
+					close(f);
+				}			
+			}
 			if(execvp(args[0],args) < 0)
 				printf("Command \"%s\" could not be executed\n", *argument); 
 				exit(-1);
 			
+			exit(1);
 		}else{
-			close(fd[0]);
-			write(fd[1], info_sent, sizeof(struct process_info));
+			//close(fd[0]);
+			//write(fd[1], info_sent, sizeof(struct process_info));
+			if(isOutputRedirection){
+				int f;
+				close(STDOUT_FILENO);
+				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+   					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
+   					
+					perror("Cannot open output file: \n"); exit(-1);
+				}else{
 			
-			if(execvp(args[0],args) < 0)
-				printf("Command \"%s\" could not be executed\n", *argument);
-				exit(-1);
+					if(execvp(commandToRedirect[0],commandToRedirect) < 0)
+						printf("Command \"%s\" could not be executed\n", *argument);
+						exit(-1);	
+					close(f);
+				}
+			}else{
+				if(execvp(args[0],args) < 0)
+					printf("Command \"%s\" could not be executed\n", *argument);
+					exit(-1);
+			}
 			
-			close(fd[1]);
 		}
 		
+		exit(1);
 		//Code never gets to here...why???
 		
 	}else{
@@ -323,6 +381,7 @@ int main(void)
 		}
 		
 		exe = executeCommand(args, &bg, &argument);
+		
 	}
 	return EXIT_SUCCESS;
 }
