@@ -19,9 +19,28 @@ struct Node** ref_l1f = &list1_front;
 struct Node* list1_rear = NULL;
 struct Node** ref_l1r = &list1_rear;
 
-unsigned char isOutputRedirection;
-char *commandToRedirect[20];
+/*
+Globl variables to handle the output redirection
+
+is_out_redirection: check if command entered asks for an output redirection
+command_redirect: command user wishes to redirect
+filename: file destination of the entered command
+*/
+unsigned char is_out_redirection;
+char *command_redirect[20];
 char filename[20];
+
+/*
+Globl variables to handle the piping command
+
+isPiping: check if command entered asks for piping
+lhs_command: command sender
+rhs_command: command receiver
+*/
+unsigned char isPiping;
+char *lhs_command[20];
+char *rhs_command[20];
+
 /*
 Struct used to store child process information
 */
@@ -60,10 +79,18 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 	} else
 	*background = 0;
 	
+	// Check if output redirection is specified..
 	if ((loc = index(line, '>')) != NULL) {
-		isOutputRedirection = 1;
+		is_out_redirection = 1;
 	} else{
-		isOutputRedirection = 0;
+		is_out_redirection = 0;
+	}
+
+	// Check if piping is specified..
+	if ((loc = index(line, '|')) != NULL) {
+		isPiping = 1;
+	} else{
+		isPiping = 0;
 	}
 	
 	while ((token = strsep(&line, " \t\n")) != NULL) 
@@ -102,9 +129,9 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 		}
 		
 		if ((loc = index(temp_arg, '>')) != NULL) {
-			isOutputRedirection = 1;
+			is_out_redirection = 1;
 		} else{
-			isOutputRedirection = 0;
+			is_out_redirection = 0;
 		}	
 		
 		while ((token = strsep(&temp_arg, " ")) != NULL) 
@@ -128,8 +155,11 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 	//add argument to history list
 	addHistory(args, &i, args_count, argument, background);
 
-	if(isOutputRedirection){
-		outputRedirection(args);
+	if(is_out_redirection){
+		setOutRedirection(args);
+	}else if(isPiping){
+		setPiping(args);
+
 	}
 	
 	return i;
@@ -170,7 +200,7 @@ void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, in
 	
 		//Check size of history list before adding a new item. Remove oldest item in the queue
 		//when there are more than 10 items in the list
-		if(list_size >= 10){
+		if(list_size == 10){
 		dequeue(ref_l1f, ref_l1r);
 		enqueue(arg_to_list, counter, ref_l1f, ref_l1r);
 		}else{
@@ -179,6 +209,8 @@ void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, in
 		/*char* arg_to_list cannot be free, 
 		otherwise the the linked list will get wrong values*/		
 	
+	//Decrease argument counter by one when command history is chosen, since it is not registered
+	//in the history list
 	}else if(strcmp(*argument,"history") == 0){
 		*counter = *counter - 1;
 	}
@@ -206,25 +238,60 @@ int getIndex(char* argument[]){
 	return val;
 }
 
-void outputRedirection(char *args[]){
+void setOutRedirection(char *args[]){
 	int i = 0;
 	//Clear command to redirect array before setting new commands
-	memset(commandToRedirect, '\0', 20);
+	memset(command_redirect, '\0', 20);
 	
 	while(strcmp(args[i],">") != 0){
-		commandToRedirect[i] = args[i];
+		command_redirect[i] = args[i];
 		i++;
 	}
 	strcpy(filename,args[i+1]);
+}
+
+void setPiping(char *args[]){
+	int i =0, j = 0;
+	//Clear rhs and lhs commands
+	memset(rhs_command, '\0', 20);
+	memset(lhs_command, '\0', 20);
+	
+	while(strcmp(args[i],"|") != 0){
+		lhs_command[i] = args[i];
+		i++;
+		break;
+	}
+
+	//To point to rhs command
+	i++;
+
+	while(i < strlen(args)){
+		rhs_command[j] = args[i];
+		i++;
+		j++;
+	}
+}
+
+int executePipeCommand(){
+	int status;
+	
+	int fd[2], nbytes;
+	pipe(fd);
+	
+	pid_t w;
+	pid_t pid = fork();
 }
 
 int executeCommand(char *args[], int *background, char** argument)
 {
 	struct process_info *info_sent = (struct process_info*)malloc(sizeof(struct process_info)); 
 		
-	if(strcmp(*argument,"exit") == 0)
-	{
+	if(strcmp(*argument,"exit") == 0){
 		exit(1);
+	}
+
+	if(isPiping){
+		executePipeCommand();
 	}
 		
 	/*
@@ -265,14 +332,16 @@ int executeCommand(char *args[], int *background, char** argument)
 	pid_t w;
 	pid_t pid = fork();
 	
-	if (pid == -1) { perror("fork"); exit(EXIT_FAILURE); }	
+	if (pid == -1) { 
+		perror("fork"); exit(EXIT_FAILURE);
+	}	
 	if(pid == 0){	
 		
 		info_sent->id  = (long)getpid();
 		info_sent->str = "Child process finished\0\n";
 		
 		if(*background == 1){
-			if(isOutputRedirection){
+			if(is_out_redirection){
 				close(STDOUT_FILENO);
 				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
    					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
@@ -280,7 +349,7 @@ int executeCommand(char *args[], int *background, char** argument)
 					perror("Cannot open output file\n"); exit(1);
 				}else{
 					
-					if(execvp(commandToRedirect[0],commandToRedirect) < 0)
+					if(execvp(command_redirect[0],command_redirect) < 0)
 						printf("Command \"%s\" could not be executed\n", *argument); 
 						exit(-1);
 					close(f);
@@ -294,8 +363,7 @@ int executeCommand(char *args[], int *background, char** argument)
 		}else{
 			//close(fd[0]);
 			//write(fd[1], info_sent, sizeof(struct process_info));
-			if(isOutputRedirection){
-				int f;
+			if(is_out_redirection){
 				close(STDOUT_FILENO);
 				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
    					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
@@ -303,7 +371,7 @@ int executeCommand(char *args[], int *background, char** argument)
 					perror("Cannot open output file: \n"); exit(-1);
 				}else{
 			
-					if(execvp(commandToRedirect[0],commandToRedirect) < 0)
+					if(execvp(command_redirect[0],command_redirect) < 0)
 						printf("Command \"%s\" could not be executed\n", *argument);
 						exit(-1);	
 					close(f);
@@ -331,7 +399,9 @@ int executeCommand(char *args[], int *background, char** argument)
 		}else{
 			 do {
 				w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
-				if (w == -1) { perror("waitpid"); exit(EXIT_FAILURE); }
+				if (w == -1){
+					perror("waitpid"); exit(EXIT_FAILURE);
+				}
 		
 				if (WIFEXITED(status)) {
 					printf("exited, status=%d\n", WEXITSTATUS(status));
