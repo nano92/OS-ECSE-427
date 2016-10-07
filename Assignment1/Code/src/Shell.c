@@ -272,7 +272,8 @@ void setPiping(char *args[]){
 	}
 }
 
-int executePipeCommand(){
+int executePipeCommand()
+{
 	int status;
 	
 	int fd[2], nbytes;
@@ -280,6 +281,30 @@ int executePipeCommand(){
 	
 	pid_t w;
 	pid_t pid = fork();
+
+	if (pid == -1) { 
+		perror("fork"); exit(EXIT_FAILURE);
+	}
+
+	if(pid == 0){
+		if(execvp(lhs_command[0],lhs_command) < 0){
+			//printf("Command \"%s\" could not be executed\n", *argument); 
+			exit(-1);
+		}
+	}
+
+	if(pid == 0){
+		if(execvp(rhs_command[0],rhs_command) < 0){
+			//printf("Command \"%s\" could not be executed\n", *argument); 
+			exit(-1);
+		}
+	}
+
+	do{
+		w = waitpid(pid, &status, 1);
+	}while (!WIFEXITED(status));
+		
+	printf("Pipe parent process finished\n");  
 }
 
 int executeCommand(char *args[], int *background, char** argument)
