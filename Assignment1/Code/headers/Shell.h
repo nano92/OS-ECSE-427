@@ -13,6 +13,7 @@ void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, in
 void setArgumentString(char *args[], int *sizeOfArgs, char** argument);
 void setOutRedirection(char *args[]);
 void printHistory();
+void printJobs();
 void setPiping(char *args[]);
 int executePipeCommand();
 int executeCommand(char *args[], int *background, char** argument);
