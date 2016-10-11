@@ -1,9 +1,14 @@
+/*
+Queue_linkedList.c header file
+
+Author: Luis Gallet Zambrano 260583750
+Last date modified: 03/10/2016
+*/
+
 #ifndef QUEUE_LINKEDLIST_H_   /* Include guard */
 #define QUEUE_LINKEDLIST_H_
 
 struct Node;
-//struct Node** front;
-//struct Node** rear;
 
 void enqueue(char* info, int* index, struct Node** front, struct Node** rear);
 void dequeue(struct Node** front, struct Node** rear);

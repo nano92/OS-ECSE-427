@@ -1,3 +1,10 @@
+/*
+Simple Shell implementation
+
+Author: Luis Gallet Zambrano 260583750
+Last date modified: 10/10/2016
+*/
+
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -13,22 +20,22 @@ Linked List global variables
 Two global variables that represent the front and the rear
 of the history list (Linked List)
 */
-struct Node *list1_front = NULL;
-struct Node **ref_l1f = &list1_front;
+struct Node *hisList_front = NULL;
+struct Node **ref_hisList_front = &hisList_front;
 
-struct Node *list1_rear = NULL;
-struct Node **ref_l1r = &list1_rear;
+struct Node *hisList_rear = NULL;
+struct Node **ref_hisList_rear = &hisList_rear;
 
 /*
 Linked List global variables
 Two global variables that represent the front and the rear
 of the jobs list (Linked List)
 */
-struct Node	*list2_front = NULL;
-struct Node **ref_l2f = &list2_front;
+struct Node	*jobList_front = NULL;
+struct Node **ref_jobList_front = &jobList_front;
 
-struct Node *list2_rear = NULL;
-struct Node **ref_l2r = &list2_rear;
+struct Node *jobList_rear = NULL;
+struct Node **ref_jobList_rear = &jobList_rear;
 
 /*
 Globl variables to handle the output redirection
@@ -51,15 +58,6 @@ rhs_command: command receiver
 bool_t isPiping = false;
 char *lhs_command[20];
 char *rhs_command[20];
-
-/*
-Struct used to store child process information
-*/
-struct process_info
-{
-	int *id;
-	char *str;
-};
 
 int getcmd(char *prompt, char *args[], int *background,int *args_count, char **argument)
 {
@@ -120,7 +118,7 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 		
 		char *temp_arg = (char *)malloc(80 * sizeof(char));
 		
-		strcpy(*argument, getItem(ref_l1f, arg_index));
+		strcpy(*argument, getItem(ref_hisList_front, arg_index));
 		
 		//Handles the case when the last argument entered was asked to be run in bg, 
 		//but not the new one
@@ -130,7 +128,7 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 		
 		//Make one temporary copy of the selected argument, because the char* will be
 		//stripped while constructing char* args[] with instruction from list
-		strcpy(temp_arg, getItem(ref_l1f, arg_index));
+		strcpy(temp_arg, getItem(ref_hisList_front, arg_index));
 		
 		i = 0;
 		
@@ -207,7 +205,7 @@ void addHistory(char *args[], int *args_size, int *counter, char **argument, int
 	setArgumentString(args, args_size, argument);
 	
 	char *arg_to_list = (char *)malloc(80 * sizeof(char));
-	int list_size = size(ref_l1f);
+	int list_size = size(ref_hisList_front);
 	
 	if(strcmp(*argument,"history") != 0 && strcmp(*argument,"exit") != 0){
 		strcpy(arg_to_list, *argument);
@@ -219,10 +217,10 @@ void addHistory(char *args[], int *args_size, int *counter, char **argument, int
 		//Check size of history list before adding a new item. Remove oldest item in the queue
 		//when there are more than 10 items in the list
 		if(list_size == 10){
-		dequeue(ref_l1f, ref_l1r);
-		enqueue(arg_to_list, counter, ref_l1f, ref_l1r);
+		dequeue(ref_hisList_front, ref_hisList_rear);
+		enqueue(arg_to_list, counter, ref_hisList_front, ref_hisList_rear);
 		}else{
-			enqueue(arg_to_list, counter, ref_l1f, ref_l1r);
+			enqueue(arg_to_list, counter, ref_hisList_front, ref_hisList_rear);
 		}
 		/*char* arg_to_list cannot be free, 
 		otherwise the the linked list will get wrong values*/		
@@ -243,7 +241,7 @@ if index = 2, it means that the command at that index was the second
 command entered by the user
 */
 void printHistory(){
-	printList(ref_l1f);
+	printList(ref_hisList_front);
 }
 
 /*
@@ -251,12 +249,12 @@ Prints the job list in the following format:
 PID- command
 */
 void printJobs(){
-	printList(ref_l2f);
+	printList(ref_jobList_front);
 }
 
 /*
-When a command from the history list is demanded, 
-this function returns the index of that command as an integer
+When a command from the history list is demanded (eg. !2), 
+this function returns the index asked by the user as an integer
 */
 int getIndex(char* argument[]){
 	char *p = argument[0];
@@ -272,6 +270,11 @@ int getIndex(char* argument[]){
 	return val;
 }
 
+/*
+This functions takes the command entered by the user and
+separates the command from the destination file, into two 
+separate variables
+*/
 void setOutRedirection(char *args[]){
 	int i = 0;
 	//Clear command to redirect array before setting new commands
@@ -284,6 +287,10 @@ void setOutRedirection(char *args[]){
 	strcpy(filename,args[i+1]);
 }
 
+/*
+Strips the pipe command entered by the user into two commands for
+proper handling 
+*/
 void setPiping(char *args[], int *args_size){
 	int i =0, j = 0;
 	//Clear rhs and lhs commands variables
@@ -305,12 +312,14 @@ void setPiping(char *args[], int *args_size){
 	}
 }
 
+/*
+This functions executethe pipe command when the boolean variable
+isPiping is set to true
+*/
 int executePipeCommand()
 {
 	int status_lhs, status_rhs;
-	
 	int fd[2];
-	
 	pid_t w_lhs,w_rhs;
 	pid_t pid_lhs, pid_rhs;
 
@@ -361,8 +370,8 @@ int executePipeCommand()
 			close(fd[1]);
 
 			do{
-				w_lhs = waitpid(pid_lhs, &status_lhs, 1);
-				w_rhs = waitpid(pid_rhs, &status_rhs, 1);
+				w_lhs = waitpid(pid_lhs, &status_lhs, WUNTRACED);
+				w_rhs = waitpid(pid_rhs, &status_rhs, WUNTRACED);
 
 			}while(!WIFEXITED(status_lhs) && !WIFEXITED(status_rhs) &&
 			 	   !WIFSIGNALED(status_lhs) && !WIFSIGNALED(status_rhs));
@@ -375,40 +384,32 @@ int executePipeCommand()
 
 int executeCommand(char *args[], int *background, char** argument)
 {
-	//struct process_info *info_sent = (struct process_info*)malloc(sizeof(struct process_info)); 
 	char *arg_jobs = (char *)malloc(80 * sizeof(char));
-
 	int child_id;
 	int status;
-	int f;
-	
-	int fd[2], nbytes;
-	pipe(fd);
-	
+	int f; //To open the file for output redirection
 	pid_t w;
 
 	//In order to add the bg command to the job list
 	strcpy(arg_jobs, *argument);	
-	
+			
+/* Built-in commands section
+*************************************************************************** 
+*/
+	//Exits shell
 	if(strcmp(*argument,"exit") == 0){
 		exit(1);
 	}
-		
-	/*
-	Built-in commands section
-	*/
 	
 	//Print the last 10 arguments entered by the user
 	if(strcmp(*argument,"history") == 0){
 		printHistory();
-		//free(info_sent);
 		return SUCCESS;
 	}
 	
 	//Sets active directory to the one entered by the user
 	if(strcmp(args[0],"cd") == 0){
         chdir(args[1]);
-		//free(info_sent);
 		return SUCCESS;
 	}
 	
@@ -416,14 +417,12 @@ int executeCommand(char *args[], int *background, char** argument)
 	if(strcmp(args[0],"pwd") == 0){
 		char s[100];
 		printf("%s\n",getcwd(s,100));
-		//free(info_sent);
 		return SUCCESS;
 	}
 
 	//Returns a list of bg commands with their corresponding id
 	if(strcmp(*argument,"jobs") == 0){
 		printJobs();
-		//free(info_sent);
 		return SUCCESS;
 	}
 
@@ -433,41 +432,37 @@ int executeCommand(char *args[], int *background, char** argument)
 		
 		do{
 			//Checks if process id is in the job list
-			if(getItem(ref_l2f, atoi(args[1])) != NULL){
+			if(getItem(ref_jobList_front, atoi(args[1])) != NULL){
 				//Wait for process to finish
-				w = waitpid(atoi(args[1]), &status, 1);
+				puts("Waiting for process to finish");
+				w = waitpid(atoi(args[1]), &status, WUNTRACED);
+				if (w == -1){
+					perror("waitpid"); 
+					return EXIT_PROCESS;
+				}
 			}else{
 				printf("Child process: %d, not found\n",atoi(args[1]) );
-				break;
+				return EXIT_PROCESS;
 			}
 		}while(!WIFEXITED(status) && !WIFSIGNALED(status)); 
 		
 		if(w == atoi(args[1])){
 			printf("Child process: %d has exited\n",atoi(args[1]) );
 		}
-		//free(info_sent);
 		return SUCCESS;
-	}
-	
-	/*
-	Built-in commands section
-	*/
+	}	
+
+/* Built-in commands section
+*************************************************************************** 
+*/
 
 	pid_t pid = fork();
 	
 	if (pid == -1) { 
 		perror("fork"); exit(EXIT_FAILURE);
 	}	
-	if(pid == 0){	
-		//child_id = getpid();
-		//info_sent->id  = &child_id;
-		//info_sent->str = arg_jobs;
-		
-		if(*background == 1){
-			//close(fd[0]);
-			//write(fd[1], info_sent, sizeof(struct process_info));
-			//close(fd[1]);	
-			printf("child process id: %d\n",getpid() );		
+	if(pid == 0){			
+		if(*background == 1){	
 			if(is_out_redirection){
 				//Reset global variable
 				is_out_redirection = false;
@@ -485,9 +480,7 @@ int executeCommand(char *args[], int *background, char** argument)
 					close(f);
 					exit(-1);
 				}			
-			}
-			//printf("arg: %s id: %d\n",*argument, child_id );
-						
+			}						
 			if(execvp(args[0],args) < 0)
 				printf("Command \"%s\" could not be executed\n", *argument); 
 				exit(-1);
@@ -495,10 +488,10 @@ int executeCommand(char *args[], int *background, char** argument)
 			exit(1);
 
 		}else{
-			//close(fd[0]);
-			//write(fd[1], info_sent, sizeof(struct process_info));
 			if(is_out_redirection){
-				is_out_redirection = 0;
+				//Reset global variable
+				is_out_redirection = false;
+
 				close(STDOUT_FILENO);
 				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
    					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
@@ -513,26 +506,20 @@ int executeCommand(char *args[], int *background, char** argument)
 					exit(1);
 				}
 			}else{
-				
 				if(execvp(args[0],args) < 0)
 					printf("Command \"%s\" could not be executed\n", *argument);
 					exit(-1);
 			}
-			
 			exit(1);
 		}
-		
-		
-		//Code never gets to here...why???
 		
 	}else{
 		if(*background == 1){
 			printf("background proccess selected\n");
 			child_id = pid;
 			//Add command to job list with its corresponding id
-			enqueue(arg_jobs, &child_id , ref_l2f, ref_l2r);
-		
-			//free(info_sent);
+			enqueue(arg_jobs, &child_id , ref_jobList_front, ref_jobList_rear);
+
 			return SUCCESS;
 			
 		}else{
@@ -552,17 +539,10 @@ int executeCommand(char *args[], int *background, char** argument)
 					printf("continued\n");
 				}
 			} while (!WIFEXITED(status)&& !WIFSIGNALED(status));
-			
-			/*close(fd[1]);
-			
-			nbytes = read(fd[0], info_sent, sizeof(struct process_info));
-			printf("From child process %d: %s\n",info_sent->id, info_sent->str);
-			close(fd[0]);*/
 		}
 			
 	printf("Parent process finished\n");        					
 	}
-	//free(info_sent);
 	return SUCCESS;
 }
 
@@ -597,6 +577,7 @@ int main(void)
 			exe = executeCommand(args, &bg, &argument);
 		}
 
+		//When user asked to fg a process that has already exited
 		if(exe == -1)
 		{
 			continue;

@@ -1,3 +1,8 @@
+
+#Simple shell implementation Makefile
+#Author: Luis Gallet Zambrano 260583750
+#Last date modified: 04/10/2016
+
 HEADERS = -I headers/
 CFLAGS = -g -Wall $(HEADERS)
 

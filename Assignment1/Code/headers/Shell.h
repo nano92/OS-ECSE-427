@@ -1,3 +1,10 @@
+/*
+Shell.c header file
+
+Author: Luis Gallet Zambrano 260583750
+Last date modified: 10/10/2016
+*/
+
 #ifndef SHELL_H_   /* Include guard */
 #define SHELL_H_
 
