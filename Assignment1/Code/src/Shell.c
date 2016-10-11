@@ -215,15 +215,16 @@ void addHistory(char *args[], int *args_size, int *counter, char **argument, int
 		}
 	
 		//Check size of history list before adding a new item. Remove oldest item in the queue
-		//when there are more than 10 items in the list
+		//when there are 10 items in the list
 		if(list_size == 10){
-		dequeue(ref_hisList_front, ref_hisList_rear);
-		enqueue(arg_to_list, counter, ref_hisList_front, ref_hisList_rear);
+			dequeue(ref_hisList_front, ref_hisList_rear);
+			enqueue(arg_to_list, counter, ref_hisList_front, ref_hisList_rear);
 		}else{
 			enqueue(arg_to_list, counter, ref_hisList_front, ref_hisList_rear);
 		}
-		/*char* arg_to_list cannot be free, 
-		otherwise the the linked list will get wrong values*/		
+		/* char* arg_to_list cannot be free, 
+		otherwise the linked list will get wrong values
+		*/		
 	
 	//Decrease argument counter by one when command history is chosen, since it is not registered
 	//in the history list
