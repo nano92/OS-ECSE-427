@@ -13,22 +13,22 @@ Linked List global variables
 Two global variables that represent the front and the rear
 of the history list (Linked List)
 */
-struct Node* list1_front = NULL;
-struct Node** ref_l1f = &list1_front;
+struct Node *list1_front = NULL;
+struct Node **ref_l1f = &list1_front;
 
-struct Node* list1_rear = NULL;
-struct Node** ref_l1r = &list1_rear;
+struct Node *list1_rear = NULL;
+struct Node **ref_l1r = &list1_rear;
 
 /*
 Linked List global variables
 Two global variables that represent the front and the rear
 of the jobs list (Linked List)
 */
-struct Node* list2_front = NULL;
-struct Node** ref_l2f = &list2_front;
+struct Node	*list2_front = NULL;
+struct Node **ref_l2f = &list2_front;
 
-struct Node* list2_rear = NULL;
-struct Node** ref_l2r = &list2_rear;
+struct Node *list2_rear = NULL;
+struct Node **ref_l2r = &list2_rear;
 
 /*
 Globl variables to handle the output redirection
@@ -37,7 +37,7 @@ is_out_redirection: check if command entered asks for an output redirection
 command_redirect: command user wishes to redirect
 filename: file destination of the entered command
 */
-unsigned char is_out_redirection;
+bool_t is_out_redirection = false;
 char *command_redirect[20];
 char filename[20];
 
@@ -48,7 +48,7 @@ isPiping: check if command entered asks for piping
 lhs_command: command sender
 rhs_command: command receiver
 */
-unsigned char isPiping;
+bool_t isPiping = false;
 char *lhs_command[20];
 char *rhs_command[20];
 
@@ -92,16 +92,16 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 	
 	// Check if output redirection is specified..
 	if ((loc = index(line, '>')) != NULL) {
-		is_out_redirection = 1;
+		is_out_redirection = true;
 	} else{
-		is_out_redirection = 0;
+		is_out_redirection = false;
 	}
 
 	// Check if piping is specified..
 	if ((loc = index(line, '|')) != NULL) {
-		isPiping = 1;
+		isPiping = true;
 	} else{
-		isPiping = 0;
+		isPiping = false;
 	}
 	
 	while ((token = strsep(&line, " \t\n")) != NULL) 
@@ -140,9 +140,16 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 		}
 		
 		if ((loc = index(temp_arg, '>')) != NULL) {
-			is_out_redirection = 1;
+			is_out_redirection = true;
 		} else{
-			is_out_redirection = 0;
+			is_out_redirection = false;
+		}
+
+		// Check if piping is specified..
+		if ((loc = index(temp_arg, '|')) != NULL) {
+			isPiping = true;
+		} else{
+			isPiping = false;
 		}	
 		
 		while ((token = strsep(&temp_arg, " ")) != NULL) 
@@ -169,7 +176,7 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 	if(is_out_redirection){
 		setOutRedirection(args);
 	}else if(isPiping){
-		setPiping(args);
+		setPiping(args, &i);
 
 	}
 	
@@ -179,9 +186,9 @@ int getcmd(char *prompt, char *args[], int *background,int *args_count, char **a
 /*
 This function creates a string of the entered argument 
 */
-void setArgumentString(char *args[], int *sizeOfArgs, char** argument){
+void setArgumentString(char *args[], int *args_size, char **argument){
 	
-	int arg_length = *sizeOfArgs;
+	int arg_length = *args_size;
 	strcpy(*argument, args[0]);
 	if(arg_length > 1){
 		for(int i=1; i < arg_length ; i++)
@@ -195,9 +202,9 @@ void setArgumentString(char *args[], int *sizeOfArgs, char** argument){
 /*
 It adds the entered argument to the history list
 */
-void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, int *background){
+void addHistory(char *args[], int *args_size, int *counter, char **argument, int *background){
 	
-	setArgumentString(args, sizeOfArgs, argument);
+	setArgumentString(args, args_size, argument);
 	
 	char *arg_to_list = (char *)malloc(80 * sizeof(char));
 	int list_size = size(ref_l1f);
@@ -227,10 +234,22 @@ void addHistory(char *args[], int *sizeOfArgs, int *counter, char** argument, in
 	}
 }
 
+/*
+Prints the history list in the following format:
+index- command
+
+Where index indicates when the command was entered, for example:
+if index = 2, it means that the command at that index was the second
+command entered by the user
+*/
 void printHistory(){
 	printList(ref_l1f);
 }
 
+/*
+Prints the job list in the following format:
+PID- command
+*/
 void printJobs(){
 	printList(ref_l2f);
 }
@@ -265,22 +284,21 @@ void setOutRedirection(char *args[]){
 	strcpy(filename,args[i+1]);
 }
 
-void setPiping(char *args[]){
+void setPiping(char *args[], int *args_size){
 	int i =0, j = 0;
-	//Clear rhs and lhs commands
+	//Clear rhs and lhs commands variables
 	memset(rhs_command, '\0', 20);
 	memset(lhs_command, '\0', 20);
 	
 	while(strcmp(args[i],"|") != 0){
 		lhs_command[i] = args[i];
 		i++;
-		break;
 	}
 
 	//To point to rhs command
 	i++;
 
-	while(i < strlen(args)){
+	while(i < *args_size){
 		rhs_command[j] = args[i];
 		i++;
 		j++;
@@ -289,9 +307,9 @@ void setPiping(char *args[]){
 
 int executePipeCommand()
 {
-	int status_lhs, status_rhs, j;
+	int status_lhs, status_rhs;
 	
-	int fd[2], nbytes;
+	int fd[2];
 	
 	pid_t w_lhs,w_rhs;
 	pid_t pid_lhs, pid_rhs;
@@ -299,7 +317,10 @@ int executePipeCommand()
 	if(pipe(fd) == -1){
 		perror("pipe"); exit(EXIT_FAILURE);
 	}
-	if ((pid_lhs == fork()) == -1) { 
+	
+	pid_lhs = fork();
+
+	if ( pid_lhs < 0) { 
 		perror("fork pid_lhs"); exit(EXIT_FAILURE);
 	}
 
@@ -309,63 +330,52 @@ int executePipeCommand()
 			perror("dup(fd[1])"); exit(EXIT_FAILURE);
 		}
 		close(fd[0]);
-		close(fd[1]);
-		fprintf(stderr,"************* Running lhs *************\n");
-		
+		close(fd[1]);		
 		if(execvp(lhs_command[0],lhs_command) < 0){
 			perror("exec pid_lhs"); exit(EXIT_FAILURE);
 		
 		exit(-1);
 
 		}
-	}
+	}else{
+		pid_rhs = fork();
 
-	if ((pid_rhs == fork()) == -1) { 
-	perror("fork pid_lrhs"); exit(EXIT_FAILURE);
-	}
-	if(pid_rhs == 0){
-		close(0);
-		if(dup(fd[0]) == -1){
-			perror("dup(fd[0])"); exit(EXIT_FAILURE);
+		if (pid_rhs < 0) { 
+		perror("fork pid_lrhs"); exit(EXIT_FAILURE);
 		}
-		close(fd[0]);
-		close(fd[1]);
-		fprintf(stderr,"************* Running second *************\n");
-		if(execvp(rhs_command[0],rhs_command) < 0){
-			perror("exec pid_rhs"); exit(EXIT_FAILURE);
+		if(pid_rhs == 0){
+			close(0);
+			if(dup(fd[0]) == -1){
+				perror("dup(fd[0])"); exit(EXIT_FAILURE);
+			}
+			close(fd[0]);
+			close(fd[1]);
+			if(execvp(rhs_command[0],rhs_command) < 0){
+				perror("exec pid_rhs"); exit(EXIT_FAILURE);
+			}
+			
+			exit(-1);
+
+		}else{
+			close(fd[0]);
+			close(fd[1]);
+
+			do{
+				w_lhs = waitpid(pid_lhs, &status_lhs, 1);
+				w_rhs = waitpid(pid_rhs, &status_rhs, 1);
+
+			}while(!WIFEXITED(status_lhs) && !WIFEXITED(status_rhs) &&
+			 	   !WIFSIGNALED(status_lhs) && !WIFSIGNALED(status_rhs));
 		}
-		
-		exit(-1);
 
 	}
-	
-	close(fd[0]);
-	close(fd[1]);
-
-	//wait(NULL);
-	//do{
-	//w_lhs =
-	waitpid(pid_lhs, NULL, 0);
-	//w_rhs = 
-	waitpid(pid_rhs, NULL, 0);
-	printf("************* Father exitting... *************\n");
-	//while((w_lhs = wait(&status_lhs)) > 0);
-
-	//}while (!status_lhs && !status_rhs);
-		
-	//printf("Pipe parent process finished\n");
-
-
 	return SUCCESS;		
-
-			//printf("Pipe parent process finished\n");
 }
 	
-	//printf("Pipe parent process finished\n");
 
 int executeCommand(char *args[], int *background, char** argument)
 {
-	struct process_info *info_sent = (struct process_info*)malloc(sizeof(struct process_info)); 
+	//struct process_info *info_sent = (struct process_info*)malloc(sizeof(struct process_info)); 
 	char *arg_jobs = (char *)malloc(80 * sizeof(char));
 
 	int child_id;
@@ -459,7 +469,9 @@ int executeCommand(char *args[], int *background, char** argument)
 			//close(fd[1]);	
 			printf("child process id: %d\n",getpid() );		
 			if(is_out_redirection){
-				is_out_redirection = 0;
+				//Reset global variable
+				is_out_redirection = false;
+
 				close(STDOUT_FILENO);
 				if ((f = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
    					S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1){
@@ -519,13 +531,6 @@ int executeCommand(char *args[], int *background, char** argument)
 			child_id = pid;
 			//Add command to job list with its corresponding id
 			enqueue(arg_jobs, &child_id , ref_l2f, ref_l2r);
-			//close(fd[1]);
-			//printf("arg: %s id: %d\n",*argument, child_id );
-			//enqueue(*argument, &child_id, ref_l2f, ref_l2r);
-			//nbytes = read(fd[0], info_sent, sizeof(struct process_info));
-			//printf("arg: %s id: %d\n",info_sent->str, *(info_sent->id) );
-			//enqueue(info_sent->str, info_sent->id, ref_l2f, ref_l2r);
-			//close(fd[0]);
 		
 			//free(info_sent);
 			return SUCCESS;
@@ -576,6 +581,7 @@ int main(void)
 		bg = 0;
 		args_count++;
 		int cnt = getcmd(hostname, args, &bg, &args_count, &argument);
+		
 		//When no command was entered (eg. blank space)
 		if(cnt == -1)
 		{
@@ -583,7 +589,8 @@ int main(void)
 		}
 		
 		if(isPiping){
-			isPiping = 0;
+		//Reset global variable
+			isPiping = false;
 			exe = executePipeCommand();
 
 		}else{
