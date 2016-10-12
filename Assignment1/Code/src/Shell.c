@@ -20,22 +20,22 @@ Linked List global variables
 Two global variables that represent the front and the rear
 of the history list (Linked List)
 */
-struct Node *hisList_front = NULL;
-struct Node **ref_hisList_front = &hisList_front;
+static struct Node *hisList_front = NULL;
+static struct Node **ref_hisList_front = &hisList_front;
 
-struct Node *hisList_rear = NULL;
-struct Node **ref_hisList_rear = &hisList_rear;
+static struct Node *hisList_rear = NULL;
+static struct Node **ref_hisList_rear = &hisList_rear;
 
 /*
 Linked List global variables
 Two global variables that represent the front and the rear
 of the jobs list (Linked List)
 */
-struct Node	*jobList_front = NULL;
-struct Node **ref_jobList_front = &jobList_front;
+static struct Node	*jobList_front = NULL;
+static struct Node **ref_jobList_front = &jobList_front;
 
-struct Node *jobList_rear = NULL;
-struct Node **ref_jobList_rear = &jobList_rear;
+static struct Node *jobList_rear = NULL;
+static struct Node **ref_jobList_rear = &jobList_rear;
 
 /*
 Globl variables to handle the output redirection
@@ -44,9 +44,9 @@ is_out_redirection: check if command entered asks for an output redirection
 command_redirect: command user wishes to redirect
 filename: file destination of the entered command
 */
-bool_t is_out_redirection = false;
-char *command_redirect[20];
-char filename[20];
+static bool_t is_out_redirection = false;
+static char *command_redirect[20];
+static char filename[20];
 
 /*
 Globl variables to handle the piping command
@@ -55,9 +55,9 @@ isPiping: check if command entered asks for piping
 lhs_command: command sender
 rhs_command: command receiver
 */
-bool_t isPiping = false;
-char *lhs_command[20];
-char *rhs_command[20];
+static bool_t isPiping = false;
+static char *lhs_command[20];
+static char *rhs_command[20];
 
 int getcmd(char *prompt, char *args[], int *background,int *args_count, char **argument)
 {
@@ -372,12 +372,22 @@ int executePipeCommand()
 
 			do{
 				w_lhs = waitpid(pid_lhs, &status_lhs, WUNTRACED);
+				if (w_lhs == -1){
+					perror("w_lhs"); 
+					return EXIT_PROCESS;
+				}
+
 				w_rhs = waitpid(pid_rhs, &status_rhs, WUNTRACED);
+
+				if (w_rhs == -1){
+					perror("w_rhs"); 
+					return EXIT_PROCESS;
+				}
 
 			}while(!WIFEXITED(status_lhs) && !WIFEXITED(status_rhs) &&
 			 	   !WIFSIGNALED(status_lhs) && !WIFSIGNALED(status_rhs));
 		}
-
+		puts("From executePipeCommand(): Parent process finished\n"); 
 	}
 	return SUCCESS;		
 }
@@ -527,22 +537,12 @@ int executeCommand(char *args[], int *background, char** argument)
 			 do {
 				w = waitpid(pid, &status, WUNTRACED | WCONTINUED);
 				if (w == -1){
-					perror("waitpid"); exit(EXIT_FAILURE);
-				}
-		
-				if (WIFEXITED(status)) {
-					printf("exited, status=%d\n", WEXITSTATUS(status));
-				} else if (WIFSIGNALED(status)) {
-					printf("killed by signal %d\n", WTERMSIG(status));
-				} else if (WIFSTOPPED(status)) {
-					printf("stopped by signal %d\n", WSTOPSIG(status));
-				} else if (WIFCONTINUED(status)) {
-					printf("continued\n");
+					perror("waitpid"); 
+					return EXIT_PROCESS;
 				}
 			} while (!WIFEXITED(status)&& !WIFSIGNALED(status));
 		}
-			
-	printf("Parent process finished\n");        					
+	puts("From executeCommand(): Parent process finished\n");        					
 	}
 	return SUCCESS;
 }
