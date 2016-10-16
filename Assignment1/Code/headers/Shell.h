@@ -24,6 +24,7 @@ void setOutRedirection(char *args[]);
 void printHistory();
 void printJobs();
 void setPiping(char *args[], int *args_size);
+void updateJobs(int size);
 int executePipeCommand();
 int executeCommand(char *args[], int *background, char** argument);
 

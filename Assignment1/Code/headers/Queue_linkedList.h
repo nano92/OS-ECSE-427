@@ -15,5 +15,6 @@ void dequeue(struct Node** front, struct Node** rear);
 char* getItem(struct Node** front, int index);
 void printList(struct Node** front);
 int size(struct Node** front);
+void getIDs(struct Node** front, int **IDs, int size);
 
 #endif // QUEUE_LINKEDLIST_H_

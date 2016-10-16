@@ -314,6 +314,31 @@ void setPiping(char *args[], int *args_size){
 }
 
 /*
+Removes the processes that are not longer running from the 
+Jobs list
+*/
+void updateJobs(int size){
+	pid_t w;
+	int status;
+	int *ID_array = (int *)malloc(size * sizeof(int));
+	int i = 0;
+	
+	//Store the processes IDs in an array
+	getIDs(ref_jobList_front, &ID_array, size);
+
+	while(i < size){
+		w = waitpid(ID_array[i], &status, WNOHANG);
+		if(w == -1){
+			//If w = -1 it means that the process is not longer running
+			dequeue(ref_jobList_front, ref_jobList_rear);
+			i++;
+		}else{
+			break;
+		}
+	}
+}
+
+/*
 This functions executethe pipe command when the boolean variable
 isPiping is set to true
 */
@@ -569,6 +594,12 @@ int main(void)
 			continue;
 		}
 		
+		//Update the Jobs list before executing a new command to ensure that
+		//the list is updated when "jobs" is executed
+		if(size(ref_jobList_front) > 0){
+				updateJobs(size(ref_jobList_front));
+		}
+
 		if(isPiping){
 		//Reset global variable
 			isPiping = false;

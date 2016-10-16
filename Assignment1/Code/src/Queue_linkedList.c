@@ -93,3 +93,13 @@ int size(struct Node** front){
 	}
 	return count;
 }
+
+void getIDs(struct Node** front, int** IDs, int size){
+	struct Node* temp = *front;
+	int i = 0;
+	while(temp != NULL || i != size){
+		(*IDs)[i] = temp->index;
+		i++;
+		temp = temp->next;
+	}
+}
