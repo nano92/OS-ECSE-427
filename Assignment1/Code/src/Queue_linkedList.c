@@ -94,6 +94,10 @@ int size(struct Node** front){
 	return count;
 }
 
+/*
+Thi function is specifically implemented to fill up an int array with
+the index values of each node
+*/
 void getIDs(struct Node** front, int** IDs, int size){
 	struct Node* temp = *front;
 	int i = 0;
