@@ -7,6 +7,8 @@ Assignment1/*
 !Assignment1/Code/Makefile
 
 Assignment2/*
+!Assignment2/Code
+Assignment2/Code/*
 !Assignment2/Code/src/*.c
 !Assignment2/Code/headers/*.h
 !Assignment2/Code/Makefile
