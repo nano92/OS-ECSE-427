@@ -4,3 +4,7 @@ Assignment1/*
 !Assignment1/Code/src/Queue_linkedList.c
 !Assignment1/Code/headers/*.h
 !Assignment1/Code/Makefile
+Assignment2/*
+!Assignment2/Code/src/*
+!Assignment2/Code/headers/*
+!Assignment2/Code/Makefile
