@@ -1,0 +1,29 @@
+
+#Simple shell implementation Makefile
+#Author: Luis Gallet Zambrano 260583750
+#Last date modified: 04/10/2016
+
+HEADERS = -I headers/
+OBJECTS = objects/Queue_linkedList.o objects/jobs_queue.o objects/sema.o objects/print_server.o
+CFLAGS = -g -Wall $(HEADERS) 
+LDFLAGS = -pthread -lrt 
+
+all: printer
+
+printer: $(OBJECTS)
+	gcc -o $@ $^ $(LDFLAGS)
+
+objects/print_server.o: src/print_server.c headers/jobs_queue.h
+	gcc $(CFLAGS) -c $< -o $@
+
+objects/sema.o: src/sema.c headers/sema.h 
+	gcc $(CFLAGS) -c $< -o $@ 
+
+objects/jobs_queue.o: src/jobs_queue.c headers/jobs_queue.h
+	gcc $(CFLAGS) -c $< -o $@
+
+objects/Queue_linkedList.o: src/Queue_linkedList.c headers/Queue_linkedList.h
+	gcc $(CFLAGS) -c $< -o $@
+	
+clean:
+	rm objects/*.o
