@@ -1,10 +1,12 @@
 !.gitignore
+
 Assignment1/*
-Assignment2/*
 !Assignment1/Code/src/Shell.c
 !Assignment1/Code/src/Queue_linkedList.c
 !Assignment1/Code/headers/*.h
 !Assignment1/Code/Makefile
-!Assignment2/Code/src/*
-!Assignment2/Code/headers/*
+
+Assignment2/*
+!Assignment2/Code/src/*.c
+!Assignment2/Code/headers/*.h
 !Assignment2/Code/Makefile
