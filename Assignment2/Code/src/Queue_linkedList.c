@@ -6,19 +6,15 @@ Last date modified: 03/10/2016
 */
 #include "Queue_linkedList.h"
 
-struct Node{
-	int source;
-	struct Node* next;
-};
-
 /*
 Function to add a node to the queue. Each node has the same format;
 "index- data"
 */
-void enqueue(int* source, struct Node** front, struct Node** rear){
+void enqueue(int source, int pages, struct Node** front, struct Node** rear){
 	struct Node* temp = 
 		(struct Node*)malloc(sizeof(struct Node)); 
-	temp->source = *source;
+	temp->source = source;
+	temp->pages = pages;
 	temp->next = NULL;
 	if(*front == NULL && *rear == NULL){
 		*front = *rear = temp;
@@ -31,11 +27,13 @@ void enqueue(int* source, struct Node** front, struct Node** rear){
 /*
 This function erase the node that is in the front of the queue
 */
-int dequeue(struct Node** front, struct Node** rear){
-	
-	struct Node* temp = NULL;
+struct Node** dequeue(struct Node** front, struct Node** rear){
+	puts("From dequeue()");
+	struct Node* temp = 
+		(struct Node*)malloc(sizeof(struct Node));
 	
 	if(*front == NULL) {
+		puts("error source?");
 		printf("Queue is Empty\n");
 		return NULL;
 	}
@@ -43,12 +41,11 @@ int dequeue(struct Node** front, struct Node** rear){
 		*front = *rear = NULL;
 	}
 	else {
-		temp = (*front)->next;
-		free(*front);
-		*front = temp;
+		temp = *front;
+		*front = (*front)->next;
 	}
 
-	return (*front)->source;
+	return &temp;
 }
 
 /*
@@ -59,7 +56,7 @@ void printList(struct Node** front){
 	struct Node* temp = *front;
 	int count = 0;
 	while(temp != NULL){
-		printf("%d- %d\n", count, temp->source);
+		printf("%d- ID = %d, pages = %d\n", count, temp->source, temp->pages);
 		temp = temp->next;
 		count++;
 	}

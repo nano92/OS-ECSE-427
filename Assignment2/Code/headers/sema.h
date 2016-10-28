@@ -6,7 +6,7 @@
 
 typedef sem_t Semaphore;
 
-Semaphore *init_semaphore(int value);
+void init_semaphore(Semaphore *sem, int value);
 void semaphore_wait(Semaphore *sem);
 void semaphore_signal(Semaphore *sem);
 

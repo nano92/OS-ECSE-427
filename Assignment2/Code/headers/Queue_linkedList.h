@@ -11,10 +11,14 @@ Last date modified: 03/10/2016
 
 #define QUEUE_LINKEDLIST_H_
 
-struct Node;
+struct Node{
+	int source;
+	int pages;
+	struct Node* next;
+};
 
-void enqueue(int* source, struct Node** front, struct Node** rear);
-int dequeue(struct Node** front, struct Node** rear);
+void enqueue(int source, int pages, struct Node** front, struct Node** rear);
+struct Node** dequeue(struct Node** front, struct Node** rear);
 void printList(struct Node** front);
 int size(struct Node** front);
 
