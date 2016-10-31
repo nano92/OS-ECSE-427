@@ -14,6 +14,7 @@ void setup_shared_memory(){
 
 void attach_shared_memory(){
     jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    
     if(jobs_controller == MAP_FAILED){
         printf("mmap() failed\n");
         exit(1);
@@ -52,20 +53,34 @@ void handler(int signo){
 
 int main(int argc, char *argv[]){
     int pages = 0;
+    //int client_id = atoi(argv[1]);
     
     if(signal(SIGINT, handler) == SIG_ERR)
         printf("Signal Handler Failure ..\n");
 
     if(argc == 2){
         setup_shared_memory();
-        puts("memory set up");
+        puts("Client: memory set up");
         attach_shared_memory();
-        puts("memory shared");
+        puts("Client: memory shared");
         
         set_pages(&pages);
 
-        put_job(&jobs_controller, atoi(argv[1]), pages);
+        jobs_controller->ID = atoi(argv[1]);
+        jobs_controller->pages = pages;
+        
+        put_job(jobs_controller);
+        //printf("Client: struct size %d\n", sizeof(jobs_controller));
 
+    if (munmap(jobs_controller, (sizeof(struct Jobs))) == -1){// ||
+        //munmap(jobs_controller->front, (sizeof(struct Node))) == -1 ||
+        //munmap(jobs_controller->rear, (sizeof(struct Node))) ==-1){
+        
+        puts("munmap failed with error:");
+        exit(1);
+    }
+    
+    close(fd);
         //detach_shared_memory();
     }
     else if(argc > 2){

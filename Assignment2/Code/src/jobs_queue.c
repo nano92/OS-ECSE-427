@@ -1,31 +1,33 @@
 #include "jobs_queue.h"
-#include "Queue_linkedList.h"
 
-void put_job(struct Jobs **job_ctrl, int item, int pages) {
-    puts("at put_job()");
-    sem_wait(&(*job_ctrl)->spaces);
-  	sem_wait(&(*job_ctrl)->mutex);
+void put_job(struct Jobs *job_ctrl) {
+    puts("Client: at put_job()");
+    sem_wait(&job_ctrl->spaces);
+  	sem_wait(&job_ctrl->mutex);
+  	puts("Client: adding job..");
+    
+    
 
-  	puts("adding job..");
-    enqueue(item, pages, &(*job_ctrl)->front, &(*job_ctrl)->rear);
-
-  	sem_post(&(*job_ctrl)->mutex);
-  	sem_post(&(*job_ctrl)->items);
+   	sem_post(&job_ctrl->mutex);
+  	sem_post(&job_ctrl->items);
+  	printf("Client: job %d added\n", job_ctrl->ID);
 }
 
-int take_job(struct Jobs **job_ctrl) {
-    puts("From take_job()");
-    struct Node **job = (struct Node **)malloc(sizeof(struct Node));
-  	sem_wait(&(*job_ctrl)->items);
-  	sem_wait(&(*job_ctrl)->mutex);
-    
-    puts("waiting for job..");
-  	job = dequeue(&(*job_ctrl)->front, &(*job_ctrl)->rear);
+void take_job(struct Jobs *job_ctrl, struct Node **job) {
+    puts("Server: from take_job()");
+    //struct Node **job = (struct Node **)malloc(sizeof(struct Node));
+  	sem_wait(&job_ctrl->items);
+  	sem_wait(&job_ctrl->mutex);
+
+  	enqueue(job_ctrl->ID, job_ctrl->pages, job_ctrl->ref_front, job_ctrl->ref_rear);
+  	//printf("Server: struct size %d\n", sizeof(job_ctrl));
+    puts("Server: waiting for job..");
+  	
+  	dequeue(job_ctrl->ref_front, job_ctrl->ref_rear, job);
     printf("Job ID: %d job pages: %d\n",(*job)->source, (*job)->pages);
 
-  	sem_post(&(*job_ctrl)->mutex);
-  	sem_post(&(*job_ctrl)->spaces);
+  	sem_post(&job_ctrl->mutex);
+  	sem_post(&job_ctrl->spaces);
 
-    puts("finished processing job..");
-    return (*job)->pages;
+    puts("Server: finished processing job..");
 }

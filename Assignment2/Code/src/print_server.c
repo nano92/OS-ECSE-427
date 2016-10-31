@@ -3,6 +3,7 @@
 int fd;
 struct Jobs *jobs_controller;
 
+
 void setup_shared_memory(){
     fd = shm_open(SHD_REG, O_CREAT | O_RDWR, S_IRWXU);
     if(fd == -1){
@@ -16,6 +17,8 @@ void setup_shared_memory(){
 
 void attach_shared_memory(){
     jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+   //jobs_controller->front = (struct Node*) mmap(NULL, sizeof(struct Node), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    //jobs_controller->rear = (struct Node*) mmap(NULL, sizeof(struct Node), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if(jobs_controller == MAP_FAILED){
         printf("mmap() failed\n");
         exit(1);
@@ -24,9 +27,10 @@ void attach_shared_memory(){
 }
 
 void init_shared_memory() {
-
     jobs_controller->front = NULL;
     jobs_controller->rear = NULL;
+    jobs_controller->ref_front = &jobs_controller->front;
+    jobs_controller->ref_rear = &jobs_controller->rear;
 
     jobs_controller->length = MAX_LENGTH;
     sem_init(&(jobs_controller->mutex), 1, 1);    
@@ -37,19 +41,27 @@ void init_shared_memory() {
 
 int main()
 {
-    int job_duration;
+    //int job_duration;
     setup_shared_memory();
-    puts("memory set up");
+    puts("Server: memory set up");
     attach_shared_memory();
-    puts("memory shared");
+    puts("Server: memory shared");
     init_shared_memory();
-    puts("memory init");
+    puts("Server: memory init");
     while(1){
-        job_duration = take_job(&jobs_controller);
+        struct Node *job = (struct Node *)malloc(sizeof(struct Node));
+        //printf("server main: %ld\n",jobs_controller);
 
-        printf("printing %d pages from client\n",job_duration);
-        sleep(job_duration);
+        take_job(jobs_controller, &job);
+
+        printf("printing %d pages from client %d\n",job->pages, job->source);
+        sleep(job->pages);
+        
+        puts("\n");
+
         puts("Finished printing\n");
+
+        free(job);
     }
 
     return 0;

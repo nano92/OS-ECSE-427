@@ -13,6 +13,7 @@ Function to add a node to the queue. Each node has the same format;
 void enqueue(int source, int pages, struct Node** front, struct Node** rear){
 	struct Node* temp = 
 		(struct Node*)malloc(sizeof(struct Node)); 
+	//puts("error?");
 	temp->source = source;
 	temp->pages = pages;
 	temp->next = NULL;
@@ -20,6 +21,7 @@ void enqueue(int source, int pages, struct Node** front, struct Node** rear){
 		*front = *rear = temp;
 		return;
 	}
+	//puts("error 2?");
 	(*rear)->next = temp;
 	*rear = temp;
 }
@@ -27,25 +29,24 @@ void enqueue(int source, int pages, struct Node** front, struct Node** rear){
 /*
 This function erase the node that is in the front of the queue
 */
-struct Node** dequeue(struct Node** front, struct Node** rear){
+void dequeue(struct Node** front, struct Node** rear, struct Node** job){
 	puts("From dequeue()");
-	struct Node* temp = 
-		(struct Node*)malloc(sizeof(struct Node));
+	//struct Node* temp = 
+	//	(struct Node*)malloc(sizeof(struct Node));
 	
 	if(*front == NULL) {
-		puts("error source?");
 		printf("Queue is Empty\n");
 		return NULL;
 	}
 	if(*front == *rear) {
-		*front = *rear = NULL;
+		*front = *rear = *job = NULL;
+
 	}
 	else {
-		temp = *front;
+		*job = *front;
 		*front = (*front)->next;
 	}
 
-	return &temp;
 }
 
 /*

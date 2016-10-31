@@ -18,7 +18,7 @@ struct Node{
 };
 
 void enqueue(int source, int pages, struct Node** front, struct Node** rear);
-struct Node** dequeue(struct Node** front, struct Node** rear);
+void dequeue(struct Node** front, struct Node** rear, struct Node** job);
 void printList(struct Node** front);
 int size(struct Node** front);
 
