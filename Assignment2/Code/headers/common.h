@@ -16,5 +16,7 @@
 
 #define SHD_REG "/memory_shared_region"
 
+typedef enum { false , true } bool_t;
+
 #endif //_INCLUDE_COMMON_H_
 

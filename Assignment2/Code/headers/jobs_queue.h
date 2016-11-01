@@ -17,7 +17,7 @@ struct Jobs {
   	int queue_length;
   	int job_in, job_out;
   	int repeated_ID;
-  	int shutdown_server;
+  	bool_t shutdown_server;
   	sem_t mutex;     
   	sem_t items;       
   	sem_t spaces;      
@@ -25,7 +25,7 @@ struct Jobs {
 
 
 void put_job(struct Jobs *job_ctrl, int item, int pages);
-int take_job(struct Jobs *job_ctrl, struct Job_info **job);
+bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job);
 int isNewJob(struct Jobs *job_ctrl, int item);
 void reset_job_queue(struct Jobs *job_ctrl);
 

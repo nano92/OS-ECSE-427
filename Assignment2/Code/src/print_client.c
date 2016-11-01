@@ -68,7 +68,7 @@ int main(int argc, char *argv[]){
 
     if(argc == 2){
         if(strcmp((argv[1]), "shutdown") == 0){
-            jobs_controller->shutdown_server = 1;
+            jobs_controller->shutdown_server = true;
             sem_post(&jobs_controller->items);
             detach_shared_memory();
             exit(0);

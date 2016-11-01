@@ -30,13 +30,13 @@ void put_job(struct Jobs *job_ctrl, int item, int pages) {
 
 }
 
-int take_job(struct Jobs *job_ctrl, struct Job_info **job) {
+bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job) {
     puts("Server: from take_job()");
 
     sem_wait(&job_ctrl->items);
 
     if(job_ctrl->shutdown_server){
-    	return 0;
+    	return false;
     }
   	sem_wait(&job_ctrl->mutex);
 
@@ -44,10 +44,13 @@ int take_job(struct Jobs *job_ctrl, struct Job_info **job) {
 
   	printf("Server: Job ID: %d job pages: %d\n",(*job)->ID, (*job)->pages);
 
+  	//When the requested jobs has been already copied to another data structure to be
+  	//"printed", its values are reset to the default one, in order to avoid the case where
+  	//a future job may have the same ID as an old one
   	job_ctrl->job_queue[job_ctrl->job_out].ID = 0;
   	job_ctrl->job_queue[job_ctrl->job_out].pages = 0;
 
-  	//Calculate next index in the job buffer that will be served next
+  	//Calculate next index in the job buffer that will be served
   	job_ctrl->job_out = (job_ctrl->job_out + 1) % job_ctrl->queue_length;
   	printf("Server: index of job_out: %d\n", job_ctrl->job_out);
 
@@ -57,7 +60,7 @@ int take_job(struct Jobs *job_ctrl, struct Job_info **job) {
 
     puts("Server: finished processing job..");
 
-   	return 1;
+   	return true;
 }
 
 /*

@@ -30,7 +30,7 @@ void init_shared_memory() {
     jobs_controller->repeated_ID = -1;
     jobs_controller->queue_length = MAX_LENGTH;
     jobs_controller->job_in = jobs_controller->job_out = 0;
-    jobs_controller->shutdown_server = 0;
+    jobs_controller->shutdown_server = false;
     sem_init(&(jobs_controller->mutex), 1, 1);    
     sem_init(&(jobs_controller->items), 1, 0);
     sem_init(&(jobs_controller->spaces), 1, MAX_LENGTH-1);
