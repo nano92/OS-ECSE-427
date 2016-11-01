@@ -5,7 +5,7 @@
 
 #define JOBS_QUEUE_H_
 
-#define MAX_LENGTH 10
+#define MAX_LENGTH 3
 
 struct Job_info{
 	int ID;
@@ -16,7 +16,6 @@ struct Jobs {
   	struct Job_info job_queue[MAX_LENGTH];
   	int queue_length;
   	int job_in, job_out;
-  	int first_job;
   	int repeated_ID;
   	int shutdown_server;
   	sem_t mutex;     
