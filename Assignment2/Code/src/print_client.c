@@ -14,7 +14,7 @@ void setup_shared_memory(){
 
 void attach_shared_memory(){
     jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    
+    //jobs_controller->job_queue = (struct Job_info*) mmap(NULL, (MAX_LENGTH * sizeof(struct Job_info)), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if(jobs_controller == MAP_FAILED){
         printf("mmap() failed\n");
         exit(1);
@@ -28,10 +28,14 @@ void set_pages(int *pages){
 }
 
 void detach_shared_memory(){
-    int r = shm_unlink(SHD_REG);
-    if (r != 0)
-        printf("shm_unlink() failed\n");
+    if(munmap(jobs_controller, (sizeof(struct Jobs))) == -1){
+       //munmap(jobs_controller->rear, (sizeof(struct Node))) ==-1){
+        puts("munmap failed with error:");
         exit(1);
+    }
+    
+    close(fd);
+    
 }
 
 void handler(int signo){
@@ -52,36 +56,39 @@ void handler(int signo){
 }
 
 int main(int argc, char *argv[]){
-    int pages = 0;
-    //int client_id = atoi(argv[1]);
+    int pages, client_id = 0;
     
     if(signal(SIGINT, handler) == SIG_ERR)
         printf("Signal Handler Failure ..\n");
 
-    if(argc == 2){
         setup_shared_memory();
         puts("Client: memory set up");
         attach_shared_memory();
         puts("Client: memory shared");
-        
-        set_pages(&pages);
 
-        jobs_controller->ID = atoi(argv[1]);
-        jobs_controller->pages = pages;
+    if(argc == 2){
+        if(strcmp((argv[1]), "shutdown") == 0){
+            jobs_controller->shutdown_server = 1;
+            sem_post(&jobs_controller->items);
+            detach_shared_memory();
+            exit(0);
+        }
         
-        put_job(jobs_controller);
+        if(atoi(argv[1]) > 0){
+            client_id = atoi(argv[1]);
+        }else{
+            puts("ID must be greater than zero!!");
+            exit(0);
+        }        
+        set_pages(&pages);
+        
+        put_job(jobs_controller, client_id, pages);
+        
+        detach_shared_memory();
+        exit(1);
+        
         //printf("Client: struct size %d\n", sizeof(jobs_controller));
 
-    if (munmap(jobs_controller, (sizeof(struct Jobs))) == -1){// ||
-        //munmap(jobs_controller->front, (sizeof(struct Node))) == -1 ||
-        //munmap(jobs_controller->rear, (sizeof(struct Node))) ==-1){
-        
-        puts("munmap failed with error:");
-        exit(1);
-    }
-    
-    close(fd);
-        //detach_shared_memory();
     }
     else if(argc > 2){
         printf("Too many arguments entered.\n");

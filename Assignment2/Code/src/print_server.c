@@ -17,7 +17,7 @@ void setup_shared_memory(){
 
 void attach_shared_memory(){
     jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-   //jobs_controller->front = (struct Node*) mmap(NULL, sizeof(struct Node), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    //jobs_controller->job_queue = (struct Job_info*) mmap(NULL, (MAX_LENGTH * sizeof(struct Job_info)), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     //jobs_controller->rear = (struct Node*) mmap(NULL, sizeof(struct Node), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if(jobs_controller == MAP_FAILED){
         printf("mmap() failed\n");
@@ -27,17 +27,24 @@ void attach_shared_memory(){
 }
 
 void init_shared_memory() {
-    jobs_controller->front = NULL;
-    jobs_controller->rear = NULL;
-    jobs_controller->ref_front = &jobs_controller->front;
-    jobs_controller->ref_rear = &jobs_controller->rear;
-
-    jobs_controller->length = MAX_LENGTH;
+    jobs_controller->first_job = 1;
+    jobs_controller->repeated_ID = -1;
+    jobs_controller->queue_length = MAX_LENGTH;
+    jobs_controller->job_in = jobs_controller->job_out = 0;
+    jobs_controller->shutdown_server = 0;
     sem_init(&(jobs_controller->mutex), 1, 1);    
     sem_init(&(jobs_controller->items), 1, 0);
     sem_init(&(jobs_controller->spaces), 1, MAX_LENGTH-1);
     
 }
+
+void destroy_shared_memory(){
+    int r = shm_unlink(SHD_REG);
+    if (r != 0)
+        printf("shm_unlink() failed\n");
+        exit(1);
+}
+
 
 int main()
 {
@@ -49,19 +56,28 @@ int main()
     init_shared_memory();
     puts("Server: memory init");
     while(1){
-        struct Node *job = (struct Node *)malloc(sizeof(struct Node));
-        //printf("server main: %ld\n",jobs_controller);
+        if(jobs_controller->shutdown_server){
+            puts("Server: shuting down...");
+            destroy_shared_memory(); 
+        }else{
+            struct Job_info *job = (struct Job_info *)malloc(sizeof(struct Job_info));
+            //printf("server main: %ld\n",jobs_controller);
 
-        take_job(jobs_controller, &job);
-
-        printf("printing %d pages from client %d\n",job->pages, job->source);
-        sleep(job->pages);
+            if (take_job(jobs_controller, &job)){
+                
+                printf("Server: printing %d pages from client %d\n",job->pages , job->ID);
+                sleep(job->pages + 10);
         
-        puts("\n");
+                puts("...\n");
 
-        puts("Finished printing\n");
+                puts("Server: finished printing\n");
 
-        free(job);
+                free(job);
+            }else{
+                free(job);
+            }   
+
+        }
     }
 
     return 0;
