@@ -27,7 +27,6 @@ void attach_shared_memory(){
 }
 
 void init_shared_memory() {
-    jobs_controller->first_job = 1;
     jobs_controller->repeated_ID = -1;
     jobs_controller->queue_length = MAX_LENGTH;
     jobs_controller->job_in = jobs_controller->job_out = 0;
@@ -66,7 +65,7 @@ int main()
             if (take_job(jobs_controller, &job)){
                 
                 printf("Server: printing %d pages from client %d\n",job->pages , job->ID);
-                sleep(job->pages + 10);
+                sleep(10);
         
                 puts("...\n");
 

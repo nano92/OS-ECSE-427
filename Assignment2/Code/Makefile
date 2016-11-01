@@ -23,14 +23,8 @@ objects/print_client.o: src/print_client.c headers/jobs_queue.h
 objects/print_server.o: src/print_server.c headers/jobs_queue.h
 	gcc $(CFLAGS) -c $< -o $@
 
-#objects/sema.o: src/sema.c headers/sema.h 
-	#gcc $(CFLAGS) -c $< -o $@ 
-
 objects/jobs_queue.o: src/jobs_queue.c headers/jobs_queue.h
 	gcc $(CFLAGS) -c $< -o $@
-
-#objects/Queue_linkedList.o: src/Queue_linkedList.c headers/Queue_linkedList.h
-	#gcc $(CFLAGS) -c $< -o $@
 	
 clean:
 	rm objects/*.o

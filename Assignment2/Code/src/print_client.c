@@ -81,14 +81,11 @@ int main(int argc, char *argv[]){
             exit(0);
         }        
         set_pages(&pages);
-        
-        put_job(jobs_controller, client_id, pages);
-        
-        detach_shared_memory();
-        exit(1);
-        
-        //printf("Client: struct size %d\n", sizeof(jobs_controller));
 
+        put_job(jobs_controller, client_id, pages);
+        detach_shared_memory();
+        exit(1);  
+        
     }
     else if(argc > 2){
         printf("Too many arguments entered.\n");
