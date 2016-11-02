@@ -61,15 +61,19 @@ int main(int argc, char *argv[]){
     if(signal(SIGINT, handler) == SIG_ERR)
         printf("Signal Handler Failure ..\n");
 
-        setup_shared_memory();
-        puts("Client: memory set up");
-        attach_shared_memory();
-        puts("Client: memory shared");
+    setup_shared_memory();
+    puts("Client: memory set up");
+    attach_shared_memory();
+    puts("Client: memory shared");
 
     if(argc == 2){
         if(strcmp((argv[1]), "shutdown") == 0){
+            //Raise shutdown flag
             jobs_controller->shutdown_server = true;
+            //Printer will be waiting from an incoming job at take_job(), thus it needs to
+            //exit the method
             sem_post(&jobs_controller->items);
+
             detach_shared_memory();
             exit(0);
         }
@@ -77,7 +81,7 @@ int main(int argc, char *argv[]){
         if(atoi(argv[1]) > 0){
             client_id = atoi(argv[1]);
         }else{
-            puts("ID must be greater than zero!!");
+            puts("ID not valid!!");
             exit(0);
         }        
         set_pages(&pages);

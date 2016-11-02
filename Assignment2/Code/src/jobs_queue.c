@@ -19,6 +19,8 @@ void put_job(struct Jobs *job_ctrl, int item, int pages) {
 
     job_ctrl->job_queue[job_ctrl->job_in].ID = item;
     job_ctrl->job_queue[job_ctrl->job_in].pages = pages;
+
+    job_ctrl->new_job = true;
     printf("Client: job %d added\n", job_ctrl->job_queue[job_ctrl->job_in].ID);
     
     job_ctrl->job_in = (job_ctrl->job_in + 1) % job_ctrl->queue_length;
@@ -30,19 +32,24 @@ void put_job(struct Jobs *job_ctrl, int item, int pages) {
 
 }
 
-bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job) {
-    puts("Server: from take_job()");
-
+bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID) {
+    //puts("Server: from take_job()");
+   
+    if(!job_ctrl->new_job){
+    	printf("No more clients for printer %d ...sleeping\n", *printerID);
+    }
+    
     sem_wait(&job_ctrl->items);
-
+    
     if(job_ctrl->shutdown_server){
     	return false;
     }
+  	
   	sem_wait(&job_ctrl->mutex);
 
   	memcpy(*job, &job_ctrl->job_queue[job_ctrl->job_out], sizeof(struct Job_info));
 
-  	printf("Server: Job ID: %d job pages: %d\n",(*job)->ID, (*job)->pages);
+  	printf("Printer %d: Job ID: %d job pages: %d\n",*printerID, (*job)->ID, (*job)->pages);
 
   	//When the requested jobs has been already copied to another data structure to be
   	//"printed", its values are reset to the default one, in order to avoid the case where
@@ -52,13 +59,14 @@ bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job) {
 
   	//Calculate next index in the job buffer that will be served
   	job_ctrl->job_out = (job_ctrl->job_out + 1) % job_ctrl->queue_length;
-  	printf("Server: index of job_out: %d\n", job_ctrl->job_out);
+  	printf("Printer %d: index of job_out: %d\n", job_ctrl->job_out);
 
+  	job_ctrl->new_job = false;
 
   	sem_post(&job_ctrl->mutex);
   	sem_post(&job_ctrl->spaces);
 
-    puts("Server: finished processing job..");
+    puts("Printer %d: finished processing job..");
 
    	return true;
 }
