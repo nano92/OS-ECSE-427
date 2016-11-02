@@ -1,11 +1,10 @@
 #ifndef JOBS_QUEUE_H_  /* Include guard */
 
 #include "common.h"
-//#include "Queue_linkedList.h"
 
 #define JOBS_QUEUE_H_
 
-#define MAX_LENGTH 3
+#define MAX_LENGTH 5
 
 struct Job_info{
 	int ID;
@@ -26,10 +25,8 @@ struct Jobs {
   	sem_t spaces;      
 };
 
-
 void put_job(struct Jobs *job_ctrl, int item, int pages);
 bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID);
 int isNewJob(struct Jobs *job_ctrl, int item);
-void reset_job_queue(struct Jobs *job_ctrl);
 
 #endif //JOBS_QUEUE

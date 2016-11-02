@@ -2,7 +2,6 @@
 
 
 void put_job(struct Jobs *job_ctrl, int item, int pages) {
-    puts("Client: at put_job()");
   	sem_wait(&job_ctrl->spaces);
  	sem_wait(&job_ctrl->mutex);
 
@@ -20,21 +19,19 @@ void put_job(struct Jobs *job_ctrl, int item, int pages) {
     job_ctrl->job_queue[job_ctrl->job_in].ID = item;
     job_ctrl->job_queue[job_ctrl->job_in].pages = pages;
 
-    job_ctrl->new_job = true;
     printf("Client: job %d added\n", job_ctrl->job_queue[job_ctrl->job_in].ID);
     
+    //Calculate the index of the incoming job
     job_ctrl->job_in = (job_ctrl->job_in + 1) % job_ctrl->queue_length;
-    printf("Client: index of job_in: %d\n", job_ctrl->job_in);
+
+    job_ctrl->new_job = true;
 
    	sem_post(&job_ctrl->mutex);
-
   	sem_post(&job_ctrl->items);
-
 }
 
-bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID) {
-    //puts("Server: from take_job()");
-   
+bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID) {   
+    
     if(!job_ctrl->new_job){
     	printf("No more clients for printer %d ...sleeping\n", *printerID);
     }
@@ -48,7 +45,6 @@ bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID) {
   	sem_wait(&job_ctrl->mutex);
 
   	memcpy(*job, &job_ctrl->job_queue[job_ctrl->job_out], sizeof(struct Job_info));
-
   	printf("Printer %d: Job ID: %d job pages: %d\n",*printerID, (*job)->ID, (*job)->pages);
 
   	//When the requested jobs has been already copied to another data structure to be
@@ -57,16 +53,15 @@ bool_t take_job(struct Jobs *job_ctrl, struct Job_info **job, int *printerID) {
   	job_ctrl->job_queue[job_ctrl->job_out].ID = 0;
   	job_ctrl->job_queue[job_ctrl->job_out].pages = 0;
 
-  	//Calculate next index in the job buffer that will be served
+  	//Calculate next index of the job that will be served next
   	job_ctrl->job_out = (job_ctrl->job_out + 1) % job_ctrl->queue_length;
-  	printf("Printer %d: index of job_out: %d\n", job_ctrl->job_out);
 
   	job_ctrl->new_job = false;
 
   	sem_post(&job_ctrl->mutex);
   	sem_post(&job_ctrl->spaces);
 
-    puts("Printer %d: finished processing job..");
+    printf("Printer %d: finished processing job...starting printing\n", *printerID);
 
    	return true;
 }
@@ -79,7 +74,6 @@ If a job with the same ID was already served in the past, the job is accepted.
 */
 int isNewJob(struct Jobs *job_ctrl, int item){
 	for(int i = job_ctrl->job_out; i < MAX_LENGTH; i++){
-		printf("job_ctrl->job_queue[%d].ID = %d\n", i, job_ctrl->job_queue[i].ID);
 		if(job_ctrl->job_queue[i].ID == item){
 			return i;
 		}
@@ -87,14 +81,3 @@ int isNewJob(struct Jobs *job_ctrl, int item){
 
 	return -1;
 }
-
-void reset_job_queue(struct Jobs *job_ctrl){
-	for(int i = 0; i < MAX_LENGTH; i++){
-		job_ctrl->job_queue[i].ID = 0;
-		job_ctrl->job_queue[i].pages = 0;
-	}
-}
-
-//int isProcessingFinished(){
-	
-//}

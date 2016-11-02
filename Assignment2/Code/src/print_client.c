@@ -8,16 +8,15 @@ void setup_shared_memory(){
     fd = shm_open(SHD_REG, O_RDWR, S_IRWXU);
     if(fd == -1){
         printf("shm_open() failed\n");
-        exit(1);
+        exit(0);
     }
 }
 
 void attach_shared_memory(){
-    jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    //jobs_controller->job_queue = (struct Job_info*) mmap(NULL, (MAX_LENGTH * sizeof(struct Job_info)), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    jobs_controller = (struct Jobs*)  mmap(NULL, sizeof(struct Jobs) + MAX_LENGTH*sizeof(struct Job_info), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if(jobs_controller == MAP_FAILED){
         printf("mmap() failed\n");
-        exit(1);
+        exit(0);
     }
 
 }
@@ -28,14 +27,11 @@ void set_pages(int *pages){
 }
 
 void detach_shared_memory(){
-    if(munmap(jobs_controller, (sizeof(struct Jobs))) == -1){
-       //munmap(jobs_controller->rear, (sizeof(struct Node))) ==-1){
+    if(munmap(jobs_controller, sizeof(struct Jobs) + MAX_LENGTH*sizeof(struct Job_info)) == -1){
         puts("munmap failed with error:");
-        exit(1);
+        exit(0);
     }
-    
     close(fd);
-    
 }
 
 void handler(int signo){
@@ -70,6 +66,7 @@ int main(int argc, char *argv[]){
         if(strcmp((argv[1]), "shutdown") == 0){
             //Raise shutdown flag
             jobs_controller->shutdown_server = true;
+            
             //Printer will be waiting from an incoming job at take_job(), thus it needs to
             //exit the method
             sem_post(&jobs_controller->items);
@@ -84,6 +81,7 @@ int main(int argc, char *argv[]){
             puts("ID not valid!!");
             exit(0);
         }        
+        
         set_pages(&pages);
 
         put_job(jobs_controller, client_id, pages);
