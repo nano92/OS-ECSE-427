@@ -1,10 +1,20 @@
+/*
+Printer Spooler
+Header file that defines the functions on job_queue.c 
+and defines the structures used: 
+Jobs and Job info
+
+Author: Luis Gallet Zambrano 260583750
+Last date modified: 04/11/2016
+*/
+
 #ifndef JOBS_QUEUE_H_  /* Include guard */
 
 #include "common.h"
 
 #define JOBS_QUEUE_H_
 
-#define MAX_LENGTH 5
+#define MAX_LENGTH 10
 
 struct Job_info{
 	int ID;

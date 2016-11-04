@@ -1,7 +1,7 @@
 
-#Simple shell implementation Makefile
+#Printer Spooler implementation Makefile
 #Author: Luis Gallet Zambrano 260583750
-#Last date modified: 04/10/2016
+#Last date modified: 01/11/2016
 
 HEADERS = -I headers/
 OBJECTS_SERVER = objects/jobs_queue.o objects/print_server.o

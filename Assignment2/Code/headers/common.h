@@ -1,3 +1,13 @@
+/*
+Printer Spooler
+Common header file used by all files, it includes libraries used
+accross the files, it sets the name of the shared memory region
+and it defines a boolean type
+
+Author: Luis Gallet Zambrano 260583750
+Last date modified: 01/11/2016
+*/
+
 #ifndef _INCLUDE_COMMON_H_
 #define _INCLUDE_COMMON_H_
 
