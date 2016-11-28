@@ -12,3 +12,10 @@ Assignment2/Code/*
 !Assignment2/Code/src
 !Assignment2/Code/headers
 !Assignment2/Code/Makefile
+
+Assignment3/*
+!Assignment3/Code
+Assignment3/Code/*
+!Assignment3/Code/src
+!Assignment3Code/headers
+!Assignment3/Code/Makefile
