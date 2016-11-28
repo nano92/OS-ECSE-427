@@ -213,6 +213,8 @@ int sfs_fopen(char *name){
     	file_descriptor_table->entries[fd_index].write_ptr = 
     							(inode_table->inodes[file->inode_index]).size;
 
+    	free(file);
+    	
     	return fd_index;
     }
 }
