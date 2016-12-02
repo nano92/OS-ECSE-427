@@ -22,6 +22,8 @@
 #define SFS_MAX_EXT         	3
 #define SFS_MAX_FDENTRIES   	1024
 #define EMPTY_BLOCK_LIST_SPACE 	(int)ceil((float)SFS_API_NUM_BLOCKS / (float)SFS_API_BLOCK_SIZE)
+#define FULL 					(char)1
+#define EMPTY 					(char)0
 
 typedef struct{
 	int magic_number;
@@ -71,7 +73,7 @@ typedef struct{
 
 typedef struct{
 	int size;
-	FileDescriptorEntry entries[SFS_MAX_FDENTRIES];
+	FileDescriptorEntry *entries;
 } FileDescriptorTable;
 
 typedef enum { false , true } bool_t;

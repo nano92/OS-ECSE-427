@@ -145,9 +145,9 @@ int write_blocks(int start_address, int nblocks, void *buffer)
     int i, e, s;
     e = 0;
     s = 0;
-
+    
     void* blockWrite = (void*) malloc(BLOCK_SIZE);
-
+    
     /*Checks that the data requested is within the range of addresses of the disk*/
     if (start_address + nblocks > MAX_BLOCK)
     {
@@ -157,7 +157,7 @@ int write_blocks(int start_address, int nblocks, void *buffer)
 
     /*Goto where the data is to be written on the disk*/        
     fseek(fp, start_address * BLOCK_SIZE, SEEK_SET);
-
+  
     /*For every block requested*/        
     for (i = 0; i < nblocks; ++i)
     {
@@ -167,7 +167,9 @@ int write_blocks(int start_address, int nblocks, void *buffer)
         memcpy(blockWrite, buffer+(i*BLOCK_SIZE), BLOCK_SIZE);
 
         fwrite(blockWrite, BLOCK_SIZE, 1, fp);
+
         fflush(fp);
+
         s++;
     }
     free(blockWrite);

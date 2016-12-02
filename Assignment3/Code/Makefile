@@ -12,8 +12,8 @@ SOURCES_PREFIX = $(addprefix src/, $(SOURCES))
 SOURCES_TEST1_PREFIX = $(addprefix src/, $(SOURCES_TEST1))
 SOURCES_TEST2_PREFIX = $(addprefix src/, $(SOURCES_TEST2))
 
-CC = clang -g -Wall $(HEADERS)
-LDFLAGS = -lm `pkg-config fuse --cflags --libs`
+CC = clang -g -Wall  -D_FILE_OFFSET_BITS=64 $(HEADERS)
+LDFLAGS = -lm `pkg-config fuse --cflags --libs` 
 EXECUTABLE=sfs
 
 all: $(SOURCES_PREFIX)
@@ -42,3 +42,5 @@ objects/sfs_api.o: src/sfs_api.c headers/sfs_api.h
 
 clean:
 	rm objects/*.o
+	rm $(EXECUTABLE)
+	rm sfs_api.sfs

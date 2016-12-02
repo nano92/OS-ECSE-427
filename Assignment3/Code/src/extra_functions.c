@@ -3,7 +3,7 @@
 
 int init_empty_block_list(char **empty_block_list){
 	//initialize empty block list and set values to 0 (empty)
-	*empty_block_list = malloc(SFS_API_NUM_BLOCKS * sizeof(char));
+	*empty_block_list = (char*)malloc(SFS_API_NUM_BLOCKS * sizeof(char));
 	memset(*empty_block_list, 0, SFS_API_NUM_BLOCKS * sizeof(char));
 	if(*empty_block_list == NULL){
 		perror("empty_block_list malloc error");
@@ -24,7 +24,8 @@ int init_empty_block_list(char **empty_block_list){
  */
 int save_empty_block_list(char **empty_block_list){
     int check;
-    char* buff_empty_block = strdup(*empty_block_list);
+    char *buff_empty_block = (char *)malloc(SFS_API_NUM_BLOCKS);
+    strcpy(buff_empty_block, (*empty_block_list));
     if(buff_empty_block == NULL){
     	fprintf(stderr, "empty block buffer strdup failed\n");
     	return -1;
@@ -36,7 +37,7 @@ int save_empty_block_list(char **empty_block_list){
     	perror("write_blocks error");
     	return -1;
     }
-    puts("after write_blocks");
+    
     free(buff_empty_block);
 
     return 1;
@@ -51,7 +52,7 @@ int save_empty_block_list(char **empty_block_list){
  */
 int get_empty_block_list(char **empty_block_list){
     int check;
-    char *buff_list = malloc(EMPTY_BLOCK_LIST_SPACE * 
+    char *buff_list = (char *)malloc(EMPTY_BLOCK_LIST_SPACE * 
     								SFS_API_BLOCK_SIZE);
     check = read_blocks(1 + SFS_INODE_TABLE_SIZE, EMPTY_BLOCK_LIST_SPACE, 
     						buff_list);
@@ -66,7 +67,8 @@ int get_empty_block_list(char **empty_block_list){
 }
 
 int update_empty_block_list(char **empty_block_list, int start_block, 
-								int num_blocks){
+								int num_blocks, char status){
+	//Ensure to get the last version on disk
 	if(get_empty_block_list(empty_block_list) < 0){
 		perror("get_empty_block_list() error");
 		return -1;
@@ -74,13 +76,20 @@ int update_empty_block_list(char **empty_block_list, int start_block,
 	
 	//Update empty block list values
 	for(int i = start_block; i < (start_block + num_blocks); i++){
-		(*empty_block_list)[i] = 1;
+		(*empty_block_list)[i] = status;
 	}
 
 	if(save_empty_block_list(empty_block_list) < 0){
     	perror("save_empty_block_list() error\n");
     	return -1;
     }
+
+    //Gets the up to date reference from disk to memory
+    if(get_empty_block_list(empty_block_list) < 0){
+		perror("get_empty_block_list() error");
+		return -1;
+	}
+	puts("Succesfull update_empty_block_list()");
 
     return 1;
 }
@@ -95,12 +104,12 @@ int init_Inode_table(InodeTable **inode_table){
     	return -1;
     }
     
-    (*inode_table)->free_inodes = (char*)malloc(MAX_INODES * sizeof(char));
+    (*inode_table)->free_inodes = (char *)malloc(MAX_INODES * sizeof(char));
     if((*inode_table)->free_inodes == NULL){
     	fprintf(stderr, "free node malloc failed\n");
     	return -1;
     }
-    (*inode_table)->inodes = (Inode*)malloc(MAX_INODES * sizeof(Inode));
+    (*inode_table)->inodes = (Inode *)malloc(MAX_INODES * sizeof(Inode));
     if((*inode_table)->inodes == NULL){
     	fprintf(stderr, "inode malloc failed\n");
     	return -1;
@@ -115,8 +124,9 @@ int init_Inode_table(InodeTable **inode_table){
 	1 = occupied	
 	*/
     for(int i = 0; i < MAX_INODES; i++) {
-        (*inode_table)->free_inodes[i] = 0;
+        (*inode_table)->free_inodes[i] = (char)0;
     }
+    
 
     return 1;
 }
@@ -129,8 +139,8 @@ int init_Inode_table(InodeTable **inode_table){
  */
 int next_available_inode(InodeTable **inode_table, int *inode_index){
     for(int i = 0; i < MAX_INODES; i++) {
-        if((*inode_table)->free_inodes[i] == 0){
-        	*inode_index = i; 
+        if((*inode_table)->free_inodes[i] == (char)0){
+        	*inode_index = i;
         	return 1; 
         }
     }
@@ -144,13 +154,13 @@ int init_super_block(InodeTable **inode_table, SuperBlock **super_block){
 		return -1;
 	}
     puts("next_available_inode()");
-    SuperBlock *buff_superblock = malloc(SFS_API_BLOCK_SIZE);
+    SuperBlock *buff_superblock = (SuperBlock *)malloc(SFS_API_BLOCK_SIZE);
     if(buff_superblock == NULL){
     	fprintf(stderr, "super block buffer malloc failed\n");
     	return -1;
     }
 
-    *super_block = malloc(sizeof(SuperBlock));
+    *super_block = (SuperBlock *)malloc(sizeof(SuperBlock));
     if(*super_block == NULL){
     	fprintf(stderr, "super block malloc failed\n");
     	return -1;
@@ -173,10 +183,11 @@ int init_super_block(InodeTable **inode_table, SuperBlock **super_block){
     return 1;
 }
 
-int find_empty_space(char **empty_block_list, int size_to_allocate, 
+int find_contiguous_empty_space(char **empty_block_list, int size_to_allocate, 
 						int *start_block, int *num_blocks){
     
-    char full, future_full;
+    char full, together;
+
     int blocks_quantity = (int)ceil((float)size_to_allocate / 
     					(float)SFS_API_BLOCK_SIZE);
     
@@ -184,13 +195,13 @@ int find_empty_space(char **empty_block_list, int size_to_allocate,
     for(int i = 0; i < SFS_API_NUM_BLOCKS; i++){
         full = (*empty_block_list)[i];
         // Checks for available index
-        if(full == 0) {
+        if(full == 0){
             bool_t flag = true;
             int j = i;
             // Looping from first free index to free index + required length
             while(flag && (j < (i + blocks_quantity))){
-                future_full = (*empty_block_list)[j];
-                if (future_full == 0){
+                together = (*empty_block_list)[j];
+                if (together == 0){
                 	flag = true;
                 }else{
                 	flag = false;
@@ -206,7 +217,69 @@ int find_empty_space(char **empty_block_list, int size_to_allocate,
             }
         }
     }
+    *start_block = *num_blocks = -1;
     return -1;
+}
+/*
+Check every element in the empty block list and returns the index of the
+first empty block
+*/
+int find_first_empty_space(char **empty_block_list){
+	
+	for(int i=0; i < SFS_API_NUM_BLOCKS; i++){
+		if((*empty_block_list)[i] == 0){
+			return i;
+		}
+	}
+
+	puts("No more free space available in disk");
+	return -1;
+
+}
+/*
+Comparator function to be used by quick sort method
+*/
+static int comparator(const void *p1, const void *p2)
+{
+	return(*(int*)p1 - *(int *)p2);
+}
+/*
+Returns the quantity of empty blocks from the empty block list
+*/
+int get_remaining_empty_space(char **empty_block_list){
+	int count = 0;
+	//In order to speed up the search, the empty block list is copied into a 
+	//a temporary list, then this list is sorted in increasing order and all 
+	//zeros occurrences are counted
+
+	char *temp_empty_block_list = (char *)malloc(SFS_API_NUM_BLOCKS);
+	if(temp_empty_block_list == NULL){
+		perror("temp_empty_block_list malloc error");
+		return -1;
+	}
+	strcpy(temp_empty_block_list,*empty_block_list); 
+	if(temp_empty_block_list == NULL){
+		perror("temp_empty_block_list malloc error");
+		return -1;
+	}
+	qsort((void *)(temp_empty_block_list), SFS_API_NUM_BLOCKS,
+					sizeof(char), comparator);
+	if(temp_empty_block_list[0] == 1){
+		//All elements in list are 1, thus the disk is full
+		return -1;
+	}else{
+		while(temp_empty_block_list[count] == 0){
+			count++;
+		}
+	}
+	free(temp_empty_block_list);
+
+	return count;
+	/*for(int i=0; i < SFS_API_NUM_BLOCKS; i++){
+		if(temp_empty_block_list[i] == 0){
+			count++;
+		}
+	}*/
 }
 
 /**
@@ -226,7 +299,8 @@ int save_block(char **empty_block_list, int *start_block, int *num_blocks,
     }
     
     //Update empty block list
-    if(update_empty_block_list(empty_block_list, *start_block, *num_blocks) < 0){
+    if(update_empty_block_list(empty_block_list, *start_block, *num_blocks, 
+    							FULL) < 0){
     	perror("update_empty_block_list() error");
     	return -1;
     }
@@ -243,22 +317,133 @@ int save_block(char **empty_block_list, int *start_block, int *num_blocks,
     return 1;
 }
 
+int save_root_Inode(InodeTable **inode_table, SuperBlock **super_block,
+					int *start_block, int *num_blocks){
+    //Initialize root directory Inode
+    Inode root;
+    root.mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
+    root.link_counter = *num_blocks;
+    root.size = *num_blocks * SFS_API_BLOCK_SIZE;
+    //The file system is designed to ensure that the blocks holding the root 
+    //directory are contiguous and are less than 12
+    for(int i=0; i < *num_blocks; i++){
+    	root.direct_ptr[i] = *start_block + i;
+	}
+	printf("num_blocks: %d, start_block: %d\n",*num_blocks, *start_block);
+    if(add_Inode(inode_table, root, (*super_block)->root_dir_inode) < 0){
+    	perror("add_Inode() error");
+		return -1;
+    }else{
+    	return 1;
+    }
+}
+
+int set_new_Inode(InodeTable **inode_table, int *index){
+	//init new file inode
+	Inode inode;
+    inode.mode = S_IRWXU | S_IRWXG | S_IRWXO;
+    inode.link_counter = 0;
+    inode.size = 0;
+    memset(inode.direct_ptr, -1, 12);
+    inode.indirect_ptr = -1;
+
+
+    if(next_available_inode(inode_table, index) < 0){
+    	perror("next_available_inode() error");
+    	return -1;
+    }
+    if(add_Inode(inode_table, inode, *index) < 0){
+    	perror("add_Inode()");
+    	return -1;
+    }
+
+    return 1;
+}
+/**
+ * Save the inode at a given index, maintain the free_inodes char array list
+ * up to date
+ * @param inode the inode to be stored
+ * @param index the index
+ */
+int add_Inode(InodeTable **inode_table, Inode inode, int index){
+    (*inode_table)->allocated_count++;
+    (*inode_table)->free_inodes[index] = (char)1;
+    (*inode_table)->inodes[index] = inode;
+    
+    if(save_Inode_table(inode_table) < 0){
+    	perror("save_inode_table() failed");
+    	return -1;
+    }else{
+    	return 1;
+    }
+}
+
+/**
+ * Persists the inode table data structure on the disk
+ * 
+ * Basic algorithm: 
+ *   The inode table is stored on the disk with its inodes entries 
+ *      Iterate over the free_inode table, for each used inode store it on disk
+ *      at its corresponding position
+ */
+int save_Inode_table(InodeTable **inode_table){
+	int check;
+   	InodeTable *buff_itable = malloc(SFS_INODE_TABLE_SIZE * SFS_API_BLOCK_SIZE);
+   	buff_itable->size = (*inode_table)->size;
+   	buff_itable->allocated_count = (*inode_table)->allocated_count;
+   	buff_itable->free_inodes = strdup((*inode_table)->free_inodes);
+   	buff_itable->inodes = malloc((*inode_table)->size * sizeof(Inode));
+   	int count = 0;
+   	for(int i=0; i < (*inode_table)->size; i++){
+   		if((*inode_table)->free_inodes[i] == 1){
+   			buff_itable->inodes[count] = (*inode_table)->inodes[i];
+   			count++;
+   		}
+   	}
+   /*	char *serialized_inode_table = malloc(SFS_INODE_TABLE_SIZE * SFS_API_BLOCK_SIZE);
+   	
+   	memcpy(serialized_inode_table, &(*inode_table)->size, sizeof(int));
+   	memcpy(serialized_inode_table + sizeof(int), 
+   								&(*inode_table)->allocated_count, sizeof(int));
+   	memcpy(serialized_inode_table + sizeof(int) + sizeof(int), 
+   						(*inode_table)->free_inodes, MAX_INODES * sizeof(char));
+   	for(int i=0; i < (*inode_table)->size; i++){
+   		if((*inode_table)->free_inodes[i] == 1){
+   			memcpy(serialized_inode_table + 
+   						sizeof(int) + sizeof(int) + 
+   							(MAX_INODES * sizeof(char)) + 
+   								(i * sizeof(Inode)), 
+   									&(*inode_table)->inodes[i], 
+   										sizeof(Inode));
+   		}
+   	}*/
+    int new_blocks = (int)ceil((float)(MAX_INODES*sizeof(Inode)) / 
+    					(float)SFS_API_BLOCK_SIZE);
+    printf("size of buffer inode table: %d\n", new_blocks);
+    check = write_blocks(1, SFS_INODE_TABLE_SIZE, buff_itable);
+    if(check <= 0){
+    	perror("write_blocks() failed");
+    	return -1;
+    }
+    free(buff_itable->free_inodes);
+    free(buff_itable->inodes);
+    free(buff_itable);
+    printf("size of root inode; %d\n", (*inode_table)->inodes[0].size );
+    puts("Succesfull save_Inode_table()");
+    return 1;
+}
 int save_root_dir(InodeTable **inode_table, SuperBlock **super_block, 
 					char **empty_block_list, int *start_block, int *num_blocks){
-	if(get_empty_block_list(empty_block_list) < 0){
-		perror("get_empty_block_list() error");
-		return -1;
-	}
-	//Get quantity of empty blocks necessary to save the Directory
-    //and get the index of the first block
-    if(find_empty_space(empty_block_list, sizeof(Directory), 
-    	start_block, num_blocks) < 0){
+	//Get quantity of contiguous empty blocks necessary to save root Directory
+    //and get the index of the first block. 
+    if(find_contiguous_empty_space(empty_block_list, sizeof(Directory),
+    								start_block, num_blocks) < 0){
     	perror("save_empty_block_list() error");
 		exit(EXIT_FAILURE);
     }
-    puts("find_empty_space()");
+    puts("find_contiguous_empty_space()");
 
-	Directory *buff_root_dir = malloc(sizeof(*num_blocks * SFS_API_BLOCK_SIZE));
+	Directory *buff_root_dir = (Directory *)malloc(sizeof(*num_blocks * SFS_API_BLOCK_SIZE));
     
     if(buff_root_dir == NULL){
     	perror("buff_root_dir malloc error\n");
@@ -276,7 +461,7 @@ int save_root_dir(InodeTable **inode_table, SuperBlock **super_block,
     free(buff_root_dir);
 
     //Save root Inode in disk
-    if(save_root_Inode(inode_table, super_block, start_block) < 0){
+    if(save_root_Inode(inode_table, super_block, start_block, num_blocks) < 0){
     	perror("save_root_Inode() error");
     	return -1;
     }
@@ -284,183 +469,82 @@ int save_root_dir(InodeTable **inode_table, SuperBlock **super_block,
     return 1;
 }
 
-int save_root_Inode(InodeTable **inode_table, SuperBlock **super_block,
-					int *start_block){
-    //Initialize root directory Inode
-    Inode root;
-    root.mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
-    root.link_counter = 1;
-    root.size = 1;
-    root.direct_ptr[0] = *start_block;
-
-    if(add_Inode(inode_table, root, (*super_block)->root_dir_inode) < 0){
-    	perror("add_Inode() error");
-		return -1;
-    }else{
-    	return 1;
-    }
-}
-
-int set_new_Inode(InodeTable **inode_table, int *index){
-	//init new file inode
-	Inode inode;
-    inode.mode = S_IRWXU | S_IRWXG | S_IRWXO;
-    inode.link_counter = 0;
-    inode.size = 0;
-    inode.indirect_ptr = -1;
-
-    if(next_available_inode(inode_table, index) < 0){
-    	perror("next_available_inode() error");
-    	return -1;
-    }
-    if(add_Inode(inode_table, inode, *index)){
-    	perror("add_Inode()");
-    	return -1;
-    }
-
-    return 1;
-}
-/**
- * Save the inode at a given index, maintain the free_inodes char array list
- * up to date
- * @param inode the inode to be stored
- * @param index the index
- */
-int add_Inode(InodeTable **inode_table, Inode inode, int index){
-    (*inode_table)->allocated_count++;
-    (*inode_table)->free_inodes[index] = 1;
-    (*inode_table)->inodes[index] = inode;
-    
-    if(save_Inode_table(inode_table) < 0){
-    	fprintf(stderr, "save_inode_table() failed\n");
-    	return -1;
-    }else{
-    	return 1;
-    }
-
-    puts("save_Inode_table()");
-}
-
-/**
- * Persists the inode table data structure on the disk
- * 
- * Basic algorithm: 
- *   The inode table is stored on the disk with its inodes entries 
- *      Iterate over the free_inode table, for each used inode store it on disk
- *      at its corresponding position
- */
-int save_Inode_table(InodeTable **inode_table){
-    int check;
-    //char *buff_inode_table = malloc(SFS_INODE_TABLE_SIZE * SFS_API_BLOCK_SIZE);
-   
-   	/*
-   	Try creating a temporary inode table and add parameters
-	*/
-    InodeTable *buff_itable = malloc(SFS_INODE_TABLE_SIZE * SFS_API_BLOCK_SIZE);
-   	buff_itable->size = (*inode_table)->size;
-   	buff_itable->allocated_count = (*inode_table)->allocated_count;
-   	buff_itable->free_inodes = strdup((*inode_table)->free_inodes);
-   	buff_itable->inodes = malloc((*inode_table)->size * sizeof(Inode));
-   	int count = 0;
-   	for(int i=0; i < (*inode_table)->size; i++){
-   		if((*inode_table)->free_inodes[i] == 1){
-   			buff_itable->inodes[count] = (*inode_table)->inodes[i];
-   			count++;
-   		}
-   	}
-   	//memcpy(buff_itable->inodes, ptr_Inodes,(*inode_table)->size * sizeof(Inode));
-
-   	//The buffer is filled following the Inode table order parameters
-
-   	//Save size of Inode table first
-	//memcpy(buff_inode_table, &((*inode_table)->size), sizeof(int));
-    //Increment pointer at next available index and save array of free nodes 
-    //after first parameter
-    //memcpy(buff_inode_table + sizeof(int), &((*inode_table)->allocated_count), 
-    //		sizeof(int));
-    //Increment pointer at next available index and save array of free nodes 
-    //after two other parameters 
-    //memcpy(buff_inode_table + 2*sizeof(int), ((*inode_table)->free_inodes), 
-   // 		MAX_INODES * sizeof(char));
-    
-    //Save the reference to the full inodes in the buffer
-    //for(int i = 0; i < (*inode_table)->size; i++){
-        //Check if inode is full
-      //  if((*inode_table)->free_inodes[i] == 1){ 
-            //Increment the pointer to save the reference to a used inode after
-            //the other parameters. Keep incrementing the pointer so the 
-            //references are stored one after another 
-         //   memcpy(buff_inode_table + 2*sizeof(int) + 
-        //   		MAX_INODES * sizeof(char) + i * sizeof(Inode), 
-         //   		&((*inode_table)->inodes[i]), sizeof(Inode));
-        //}
-    //}
-    check = write_blocks(1, SFS_INODE_TABLE_SIZE, buff_itable);
-    if(check <= 0){
-    	fprintf(stderr, "write_blocks() failed\n");
-    	return -1;
-    }
-    
-    free(buff_itable);
-
-    return 1;
-}
-
 int update_root_dir(Directory **root_dir, InodeTable **inode_table, 
 					SuperBlock **super_block, int *index, char *filename){
-	//Get fresh root dir refence
-	if(get_root_dir(root_dir, inode_table, super_block) < 0){
-		perror("get_root_dir() error");
-		return -1;
-	}
-	//Update count
-	(*root_dir)->count++;
+
+	
 	//Directory entries needs to be increased since there is a new file
-	DirectoryEntry *new_entries = malloc((*root_dir)->count * 
+	Inode *root = &((*inode_table)->inodes[(*super_block)->root_dir_inode]);
+	Directory *buff_root_dir = (Directory *)malloc(sizeof((*root_dir)));
+	buff_root_dir->entries = (DirectoryEntry *)malloc(((*root_dir)->count + 1) * 
 											sizeof(DirectoryEntry));
-	if(new_entries == NULL){
-		perror("new_entries malloc error");
+	if(buff_root_dir->entries == NULL){
+		perror("buffer root dir entries malloc error");
 		return -1;
 	}
 	//Get old entries into new entries buffer
-	for(int i=0; i < (*root_dir)->count - 1; i++){
-		strcpy(new_entries[i].filename, (*root_dir)->entries[i].filename);
-		new_entries[i].inode_index = (*root_dir)->entries[i].inode_index;
+	for(int i=0; i < (*root_dir)->count; i++){
+		strcpy(buff_root_dir->entries[i].filename, (*root_dir)->entries[i].filename);
+		buff_root_dir->entries[i].inode_index = (*root_dir)->entries[i].inode_index;
 	}
 	//Add new file information to the entries buffer
-	strcpy(new_entries[(*root_dir)->count].filename, filename);
-	new_entries[(*root_dir)->count].inode_index = *index;
+	strcpy(buff_root_dir->entries[(*root_dir)->count].filename, filename);
+	buff_root_dir->entries[(*root_dir)->count].inode_index = *index;
+	printf("buffer filename: %s\n", buff_root_dir->entries[(*root_dir)->count].filename);
+
 	//Clean old entries data structure from root dir and replace it with the new
 	//updated one
-	memset((*root_dir)->entries, 0, 
-		((*root_dir)->count - 1)*sizeof(DirectoryEntry));
-	
-	(*root_dir)->entries = malloc(sizeof(new_entries));
+	//memset((*root_dir)->entries, 0, 
+		//((*root_dir)->count *sizeof(DirectoryEntry)));
+	free((*root_dir)->entries);
+	(*root_dir)->entries = (DirectoryEntry *)malloc(sizeof((*root_dir)->count * 
+											sizeof(DirectoryEntry)));
 	if((*root_dir)->entries == NULL){
 		perror("(*root_dir)->entries malloc error");
 		return -1;
 	}
 	
-	memcpy((*root_dir)->entries, new_entries, 
-			(*root_dir)->count*sizeof(DirectoryEntry));
-	free(new_entries);
-
+	for(int i=0; i < (*root_dir)->count; i++){
+		strcpy((*root_dir)->entries[i].filename,buff_root_dir->entries[i].filename);
+		(*root_dir)->entries[i].inode_index = buff_root_dir->entries[i].inode_index;
+	}
+	
+	strcpy((*root_dir)->entries[(*root_dir)->count].filename,buff_root_dir->entries[(*root_dir)->count].filename);
+	(*root_dir)->entries[(*root_dir)->count].inode_index = buff_root_dir->entries[(*root_dir)->count].inode_index;
+	
+	printf("root dir filename: %s\n", (*root_dir)->entries[(*root_dir)->count].filename);
 	//Save root dir in disk; create a buffer in case there is an error while 
 	//saving the data into the disk
-	Inode *root = &((*inode_table)->inodes[(*super_block)->root_dir_inode]);
-	Directory *buff_root_dir = malloc(sizeof((*root_dir)));
-	if(buff_root_dir == NULL){
-		perror("buff_root_dir malloc error");
-		return -1;
-	}
-	buff_root_dir = (*root_dir);
+	//Update count
+	puts("error 1");
+	(*root_dir)->count++;
+	puts("error 2");
+	buff_root_dir->count = (*root_dir)->count;
+	puts("error 3");
+	//Since root directory blocks are all contiggious, it is not necessary to 
+	//check all direct pointers; just the first direct pointer is needed
+	
+	int new_blocks = (int)ceil((float)sizeof(buff_root_dir) / 
+    					(float)SFS_API_BLOCK_SIZE);
+	printf("size of buff root dir: %d\n", new_blocks);
 	int check = write_blocks(root->direct_ptr[0], root->link_counter, 
-								buff_root_dir);
+								(*root_dir));
+	puts("error 4");
 	if(check <= 0){
+		printf("check: %d\n", check);
 		perror("write_blocks() error");
 		return -1;
 	}
+	puts("error 5");
+	free(buff_root_dir->entries);
 	free(buff_root_dir);
+	puts("error 6");
+	//Get updated reference from root dir and other important structres from 
+  	//disk to memory
+  	if(get_root_dir(root_dir, inode_table, super_block) < 0){
+        	perror("get_root_dir() error");
+			return -1;
+    }
 
 	return 1;
 }
@@ -476,20 +560,24 @@ int get_root_dir(Directory **root_dir, InodeTable **inode_table,
 					SuperBlock **super_block){
 	int check;
 
-    if(*root_dir != 0){
-    	//free(root_dir->entries); 
-    	free(*root_dir); 
+    if((*root_dir) != 0){
+    	
+		free((*root_dir)->entries); 
+		//Free reference of root dir in memory to get one fresh from disk
+		puts("free root dir");
+		free(*root_dir); 
     }
+
     if(get_Inode_table(inode_table) < 0){
-    	fprintf(stderr, "get_Inode_table() error\n");
+    	perror("get_Inode_table() error");
 		return -1;
     }
     puts("get_Inode_table()");
     
     Inode *root = &((*inode_table)->inodes[(*super_block)->root_dir_inode]);
-    
+    printf("root inode size: from get root dir %d\n", root->size);
     // read the whole root directory block(s) in the buffer
-    Directory *buff_root_dir = malloc(root->link_counter * SFS_API_BLOCK_SIZE);
+    Directory *buff_root_dir = (Directory *)malloc(root->link_counter * SFS_API_BLOCK_SIZE);
     
     if(buff_root_dir == NULL){
     	fprintf(stderr, "buff_root_dir malloc error\n");
@@ -508,15 +596,16 @@ int get_root_dir(Directory **root_dir, InodeTable **inode_table,
     	return -1;
     }
     (*root_dir)->count = buff_root_dir->count;
-    (*root_dir)->entries = malloc((*root_dir)->count * sizeof(DirectoryEntry));
+    (*root_dir)->entries = (DirectoryEntry *)malloc((*root_dir)->count * sizeof(DirectoryEntry));
     
     if((*root_dir)->entries == NULL) { 
         return -1;
     }
     
-    memcpy((*root_dir)->entries, buff_root_dir->entries, 
-    		sizeof(DirectoryEntry) * (*root_dir)->count);
-    
+  	for(int i=0; i < (*root_dir)->count; i++){
+		strcpy((*root_dir)->entries[i].filename,buff_root_dir->entries[i].filename);
+		(*root_dir)->entries[i].inode_index = buff_root_dir->entries[i].inode_index;
+	}
     // free buffer
     free(buff_root_dir);
 
@@ -528,20 +617,28 @@ int get_root_dir(Directory **root_dir, InodeTable **inode_table,
  */
 int get_Inode_table(InodeTable **inode_table){
     int check;
-    if(*inode_table != 0){
-    	//free((*inode_table)->inodes);
-    	//free(itbl->free_inodes);
-    	free(*inode_table);
-    }
-    InodeTable *buff_inode_table = malloc(SFS_INODE_TABLE_SIZE * 
+    
+    if((*inode_table) != 0){
+		free((*inode_table)->inodes);
+		free((*inode_table)->free_inodes);
+		free(*inode_table);
+		puts("free inode table");
+	}
+    
+    InodeTable *buff_inode_table = (InodeTable *)malloc(SFS_INODE_TABLE_SIZE * 
     										SFS_API_BLOCK_SIZE);
+    if(buff_inode_table == NULL){
+    	perror("buff_inode_table malloc error");
+    	return -1;
+    }
+
     check = read_blocks(1, SFS_INODE_TABLE_SIZE, buff_inode_table);
     if(check <= 0){
     	fprintf(stderr, "read_blocks() failed\n");
     	return -1;
     }
 
-    *inode_table = malloc(sizeof(InodeTable));
+    *inode_table = (InodeTable *)malloc(sizeof(InodeTable));
     if(*inode_table == NULL){
     	fprintf(stderr, "free inodes malloc failed\n");
     	return -1;
@@ -549,25 +646,47 @@ int get_Inode_table(InodeTable **inode_table){
 
     (*inode_table)->size = buff_inode_table->size;
     (*inode_table)->allocated_count = buff_inode_table->allocated_count;
-    (*inode_table)->free_inodes = (char*)malloc((*inode_table)->size *
-    											sizeof(char));
+    (*inode_table)->free_inodes = (char *)calloc(MAX_INODES, sizeof(char));
+    
     if((*inode_table)->free_inodes == NULL){
     	fprintf(stderr, "free inodes malloc failed\n");
     	return -1;
     }
+    //Need to deseralized data
+    memcpy((*inode_table)->free_inodes, buff_inode_table + 2*sizeof(int), MAX_INODES * sizeof(char));
+    //strcpy((*inode_table)->free_inodes, buff_inode_table->free_inodes);
+    if((*inode_table)->free_inodes == NULL){
+   		perror("Inode table free_inodes strdup error");
+   		return -1;
+   	}
+   	
 
-    (*inode_table)->inodes = (Inode*)malloc((*inode_table)->size *
+    (*inode_table)->inodes = (Inode *)malloc((*inode_table)->size *
     											sizeof(Inode));
     if((*inode_table)->inodes == NULL){
     	fprintf(stderr, "inodes malloc failed\n");
     	return -1;
     }
-    
-    (*inode_table)->free_inodes = strdup(buff_inode_table->free_inodes);
-    memcpy((*inode_table)->inodes, buff_inode_table->inodes, 
-    		(*inode_table)->size * sizeof(Inode));
-    
-    free(buff_inode_table);
+    printf("root inode size %d\n",(*inode_table)->inodes[0].size);
+    printf("size of root inode from get inode table: %d\n", buff_inode_table->inodes[0].size);
+    for(int i=0; i < (*inode_table)->size; i++){	
+    	printf("free inodes %d, index %d\n",buff_inode_table->free_inodes[i], i);	
+		if((*inode_table)->free_inodes[i] == (char)1){
+			(*inode_table)->inodes[i] = buff_inode_table->inodes[i];
+			/*(*inode_table)->inodes[i].link_counter = 
+										buff_inode_table->inodes[i].link_counter;
+			(*inode_table)->inodes[i].size = buff_inode_table->inodes[i].size;
+			(*inode_table)->inodes[i].indirect_ptr = 
+										buff_inode_table->inodes[i].indirect_ptr;
+			for(int j=0; j < (*inode_table)->inodes[i].link_counter; j++){
+				(*inode_table)->inodes[i].direct_ptr[j] = 
+										buff_inode_table->inodes[i].direct_ptr[j];
+			}*/
+		}
+  			//count++;
+    }
+    printf("root inode size %d\n",(*inode_table)->inodes[0].size);	
+	free(buff_inode_table);
     return 1;
 }
 
@@ -579,6 +698,13 @@ int init_FD_table(FileDescriptorTable **fd_table){
     
     if(*fd_table == NULL){
     	perror("fd_table malloc error");
+    	return -1;
+    }
+
+    (*fd_table)->entries = malloc(SFS_MAX_FDENTRIES * 
+    								sizeof(FileDescriptorEntry));
+    if((*fd_table)->entries == NULL){
+    	perror("fd table entries malloc error");
     	return -1;
     }
     
@@ -608,15 +734,9 @@ int next_available_fd(FileDescriptorTable **file_descriptor_table,
     return -1;
 }
 
-int get_file(Directory **root_dir, InodeTable **inode_table, 
-				SuperBlock **super_block, DirectoryEntry **file,
-					char *filename){
-
-	if(get_root_dir(root_dir, inode_table, super_block) < 0){
-        	perror("get_root_dir() error");
-			return -1;
-    }
+int get_file(Directory **root_dir, DirectoryEntry **file, char *filename){
     int dir_index = 0;
+
     while(dir_index < (*root_dir)->count){
     	if(strcmp((*root_dir)->entries[dir_index].filename, filename) == 0){
     		memcpy(*file, &(*root_dir)->entries[dir_index], 
@@ -634,7 +754,7 @@ Set Inode of the new file and updates the Inode Table.
 A new entry is added to the root directory and it is updated to the disk
 */
 int create_file(Directory **root_dir, InodeTable **inode_table, 
-					SuperBlock **super_block, DirectoryEntry **file, 
+					SuperBlock **super_block, DirectoryEntry **file,
 						char *filename){
 	int index;
 
@@ -642,14 +762,15 @@ int create_file(Directory **root_dir, InodeTable **inode_table,
 		perror("set_new_Inode() error");
 		return  -1;
 	}
-
+	puts("set_new_Inode()");
 	if(update_root_dir(root_dir, inode_table, super_block,
 						 &index, filename) < 0){
 		perror("update_root_dir() error");
 		return -1;
 	}
-	//Get the last added file
-	*file = &(*root_dir)->entries[(*root_dir)->count];
+	puts("update_root_dir()");
+	memcpy(*file, &(*root_dir)->entries[(*root_dir)->count - 1], 
+		sizeof(DirectoryEntry));
 	
 	return 1;
 }
