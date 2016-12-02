@@ -6,10 +6,10 @@ For all tests, -1 is considered error and 0 is considered success.
 int simple_test(){
   printf("\n-------------------------------\nInitializing Simple test.\n--------------------------------\n\n");
   char **write_buf;
-  int file_id[MAX_FD];
-  char *file_names[MAX_FD];
-  int *write_ptr = calloc(MAX_FD, sizeof(int));
-  int *file_size = calloc(MAX_FD, sizeof(int));
+  int file_id[ABS_CAP_FD];
+  char *file_names[ABS_CAP_FD];
+  int *write_ptr = calloc(ABS_CAP_FD, sizeof(int));
+  int *file_size = calloc(ABS_CAP_FD, sizeof(int));
   int num_file = 5;
   int iterations = 5;
   int err_no = 0;

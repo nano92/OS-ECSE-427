@@ -6,9 +6,10 @@ SuperBlock *super_block;
 Inode *inode_table;
 //Directory *root_dir;
 DirectoryEntry *root_dir;
-FileDescriptorTable *file_descriptor_table;
+FileDescriptorEntry *file_descriptor_table;
 char *empty_block_list;
 static int dir_current_pos = 0;
+static int total_files = 0;
 
 void mksfs(int fresh){
 	if(fresh){
@@ -42,7 +43,7 @@ void mksfs(int fresh){
 		}
 		puts("init_super_block()");
 		//Update empty block list and set superblock block space to 1 (full)
-		if(update_empty_block_list(&empty_block_list, added_space, 1, FULL) < 0){
+		if(update_empty_block_list(&empty_block_list, added_space, 1, (char)FULL) < 0){
 			perror("update_empty_block_list() error");
 			exit(EXIT_FAILURE);
 		}
@@ -52,18 +53,18 @@ void mksfs(int fresh){
 
 		//Update empty block list Set Inode table block space to 1 (full)
 		if(update_empty_block_list(&empty_block_list, added_space, 
-									SFS_INODE_TABLE_SIZE, FULL) < 0){
+									SFS_INODE_TABLE_SIZE, (char)FULL) < 0){
 			perror("update_empty_block_list() error");
 			exit(EXIT_FAILURE);
 		}
 		/*for(int i = 0; i < SFS_INODE_TABLE_SIZE; i++) {
             empty_block_list[added_space + i] = (char)1;
         }*/
-        added_space = added_space + SFS_INODE_TABLE_SIZE;
+        added_space += SFS_INODE_TABLE_SIZE;
 
         //Update empty blocka and set empty block list space to 1 (full)
         if(update_empty_block_list(&empty_block_list, added_space, 
-									EMPTY_BLOCK_LIST_SPACE, FULL) < 0){
+									EMPTY_BLOCK_LIST_SPACE, (char)FULL) < 0){
 			perror("update_empty_block_list() error");
 			exit(EXIT_FAILURE);
 		}
@@ -156,10 +157,10 @@ int sfs_get_next_file_name(char *fname){
 			return -1;
     }
 
-    if(dir_current_pos >= root_dir->count) { 
+    if(dir_current_pos >= total_files) { 
         return 0;
     }
-    strcpy(fname, root_dir->entries[dir_current_pos].filename);
+    strcpy(fname, root_dir[dir_current_pos].filename);
    	dir_current_pos++;
     return 1;
 }
@@ -181,7 +182,7 @@ int sfs_get_file_size(char* path){
   		perror("get_file() erorr");
   		return -1;
   	}
-  	size = inode_table->inodes[file->inode_index].size;
+  	size = inode_table[file->inode_index].size;
   	free(file);
   	
   	return size;
@@ -204,6 +205,8 @@ int sfs_fopen(char *name){
   		if(create_file(&root_dir, &inode_table, &super_block, &file, name) < 0){
   			perror("create_file() error");
   			return -1;
+  		}else{
+  			total_files++;
   		}
   	}
   	
@@ -211,9 +214,9 @@ int sfs_fopen(char *name){
   	printf("inode index: %d\n", file->inode_index);
   	//DirectoryEntry *file =  &(root_dir->entries[root_dir->count]);
     // check if the file is already opened
-    for(int i = 0; i < file_descriptor_table->size; i++) {
-        if((file_descriptor_table->entries[i]).busy == 1 && 
-        	(file_descriptor_table->entries[i]).iNode==file->inode_index){
+    for(int i = 0; i < SFS_MAX_FDENTRIES; i++) {
+        if(file_descriptor_table[i].busy == 1 && 
+        	file_descriptor_table[i].iNode == file->inode_index){
             printf("File %s is already open", file->filename);
             return -1;
         }
@@ -224,13 +227,13 @@ int sfs_fopen(char *name){
     		close some files before trying again", name);
     	return -1;
     }else{
-    	file_descriptor_table->entries[fd_index].busy = 1;
-    	file_descriptor_table->entries[fd_index].iNode = file->inode_index;
+    	file_descriptor_table[fd_index].busy = 1;
+    	file_descriptor_table[fd_index].iNode = file->inode_index;
     	//File is opened if append mode. Thus, the read pointer is set at the 
     	//beginning of the file and the write pointer at the end
-    	file_descriptor_table->entries[fd_index].read_ptr = 0;
-    	file_descriptor_table->entries[fd_index].write_ptr = 
-    							(inode_table->inodes[file->inode_index]).size;
+    	file_descriptor_table[fd_index].read_ptr = 0;
+    	file_descriptor_table[fd_index].write_ptr = 
+    							(inode_table[file->inode_index]).size;
     	free(file);
     }
     return fd_index;
@@ -238,11 +241,11 @@ int sfs_fopen(char *name){
 int sfs_fclose(int fileID){
  	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= file_descriptor_table->size){
+	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_fclose() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
-	}else if(file_descriptor_table->entries[fileID].busy == 0){
+	}else if(file_descriptor_table[fileID].busy == 0){
 		printf("sfs_fclose() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);
 		return -1;
@@ -250,41 +253,41 @@ int sfs_fclose(int fileID){
 		//Sets the requested file descriptr free to be used by another file.
 		//This means that the file cannot longer be accessed for editing, thus 
 		//it is closed
-		file_descriptor_table->entries[fileID].busy = 0;
+		file_descriptor_table[fileID].busy = 0;
 		return 0;
 	}
 }
 int sfs_frseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= file_descriptor_table->size){
+	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_frseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
-	}else if(file_descriptor_table->entries[fileID].busy == 0){
+	}else if(file_descriptor_table[fileID].busy == 0){
 		printf("sfs_frseek() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);		
 		return -1;
 	}else{
 		//Move read pointer to desired location in the file
-		file_descriptor_table->entries[fileID].read_ptr = loc;
+		file_descriptor_table[fileID].read_ptr = loc;
 		return 0;
 	}
 }
 int sfs_fwseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= file_descriptor_table->size){
+	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_frseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
-	}else if(file_descriptor_table->entries[fileID].busy == 0){
+	}else if(file_descriptor_table[fileID].busy == 0){
 		printf("sfs_frseek() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);		
 		return -1;
 	}else{
 		//Move write pointer to desired location in the file
-		file_descriptor_table->entries[fileID].write_ptr = loc;
+		file_descriptor_table[fileID].write_ptr = loc;
 		return 0;
 	}
 }
@@ -298,18 +301,19 @@ int sfs_fwrite(int fileID, char *buf, int length){
  */
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= file_descriptor_table->size){
+	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_fwrite() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
-	}else if(file_descriptor_table->entries[fileID].busy == 0){
+	}else if(file_descriptor_table[fileID].busy == 0){
 		printf("sfs_fwrite() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);		
 		return -1;
 	}
 	//check if there is enough space on disk to allocate requiered data
 	int free_blocks = get_remaining_empty_space(&empty_block_list);
-	int requiered_blocks = (int)floor((float)(length/(float)SFS_API_BLOCK_SIZE));
+	int requiered_blocks = (int)ceil((float)(length/(float)SFS_API_BLOCK_SIZE));
+	printf("free blocks: %d, requiered blocks: %d\n", free_blocks, requiered_blocks);
 
 	if(free_blocks < 0 || (free_blocks < requiered_blocks)){
 		puts("sfs_fwrite() error: There is not enough space on disk");
@@ -317,11 +321,11 @@ int sfs_fwrite(int fileID, char *buf, int length){
 	}
 
 	int written_bytes = 0;
-	FileDescriptorEntry *fd = &(file_descriptor_table->entries[fileID]);
-	
+	FileDescriptorEntry *fd = &(file_descriptor_table[fileID]);
+	printf("fd inode: %d\n", fd->iNode);
 	//First case:  write to an empty file
 	//check if file is empty
-	if((inode_table->inodes[fd->iNode]).size == 0){
+	if((inode_table[fd->iNode]).size == 0){
 		//check if there are enough contiguous blocks to write 
 		//the requiered data
 		int start_block, num_blocks;
@@ -349,8 +353,8 @@ int sfs_fwrite(int fileID, char *buf, int length){
 	    				perror("save_block() error");
 	    				return -1;
 	    			}
-	    			inode_table->inodes[fd->iNode].direct_ptr[i] = start_block;
-	    			inode_table->inodes[fd->iNode].link_counter++;
+	    			inode_table[fd->iNode].direct_ptr[i] = start_block;
+	    			inode_table[fd->iNode].link_counter++;
 			    	free(temp_buf);
 	    		}
 
@@ -374,9 +378,8 @@ int sfs_fwrite(int fileID, char *buf, int length){
     				return -1;
     			}
     			for(int i=0; i < requiered_blocks; i++){
-    				inode_table->inodes[fd->iNode].
-    											direct_ptr[i] = start_block + i;
-    				inode_table->inodes[fd->iNode].link_counter++;
+    				inode_table[fd->iNode].direct_ptr[i] = start_block + i;
+    				inode_table[fd->iNode].link_counter++;
     			}
 		    	free(temp_buf);
 	    	}else{
@@ -387,17 +390,15 @@ int sfs_fwrite(int fileID, char *buf, int length){
 		//the written bytes is the full size of the requiered blocks. If it
 		//was not then then we only take into consideration the bytes 
 		//written to the last block plus the full size of the rest of them
-		int block_added_space = length % SFS_API_BLOCK_SIZE;
+		int block_added_space = fd->write_ptr % SFS_API_BLOCK_SIZE;
 		if(block_added_space == 0){
-			inode_table->inodes[fd->iNode].size = 
-				written_bytes = 
-					requiered_blocks * SFS_API_BLOCK_SIZE;
+			inode_table[fd->iNode].size = requiered_blocks * SFS_API_BLOCK_SIZE;
+			
 		}else{
-			inode_table->inodes[fd->iNode].size = 
-				written_bytes = 
-					(requiered_blocks-1)*SFS_API_BLOCK_SIZE+block_added_space;
+			inode_table[fd->iNode].size = 
+					((requiered_blocks-1)*SFS_API_BLOCK_SIZE)+block_added_space;
 		}
-		
+		written_bytes = inode_table[fd->iNode].size;
 		return written_bytes;
 
 	}else{
@@ -432,17 +433,12 @@ fullBLockstoWriteTo = floor((toalLength - #ofbiytesThatSavedInFirstblock)/1024)
 
 int main(){
 	mksfs(1);
-	int fds[20];
-    for(int i = 0; i < 20; i++) {
-        char name[1024];
-        sprintf(name, "file_%d", i);
-        fds[i] = sfs_fopen(name);
-        
-        if(fds[i] >= 0) {
-            printf("Opened %s\n", name);
-        }
-        
-    }
+	
+	int fd = sfs_fopen("test_file");
+	printf("%d\n", inode_table[file_descriptor_table[fd].iNode].size );
+	char *buff = "test";
+	int wrt = sfs_fwrite(fd, buff, strlen(buff) + 1);
+	printf("written: %d\n", wrt);
 	return 1;
 
 }
