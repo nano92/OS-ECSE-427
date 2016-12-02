@@ -18,8 +18,8 @@
 #define SFS_INODE_TABLE_SIZE    20
 #define MAX_INODES 		(int)floor((float)(SFS_INODE_TABLE_SIZE*SFS_API_BLOCK_SIZE) / (float)sizeof(Inode))
 #define SFS_NUM_DIRECT_PTR  	12
-#define SFS_MAX_FILENAME    	13
-#define SFS_MAX_EXT         	3
+#define SFS_MAX_FILENAME    	15
+//#define SFS_MAX_EXT         	3
 #define SFS_MAX_FDENTRIES   	1024
 #define EMPTY_BLOCK_LIST_SPACE 	(int)ceil((float)SFS_API_NUM_BLOCKS / (float)SFS_API_BLOCK_SIZE)
 #define FULL 					(char)1
@@ -55,7 +55,7 @@ typedef struct{
 
 typedef struct{
 	char filename[SFS_MAX_FILENAME];
-	char ext[SFS_MAX_EXT];
+	//char ext[SFS_MAX_EXT];
 	int inode_index;
 } DirectoryEntry;
 

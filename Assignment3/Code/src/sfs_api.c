@@ -2,8 +2,10 @@
 #include "extra_functions.h"
 
 SuperBlock *super_block;
-InodeTable *inode_table;
-Directory *root_dir;
+//InodeTable *inode_table;
+Inode *inode_table;
+//Directory *root_dir;
+DirectoryEntry *root_dir;
 FileDescriptorTable *file_descriptor_table;
 char *empty_block_list;
 static int dir_current_pos = 0;
