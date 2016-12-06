@@ -18,12 +18,15 @@
 #define SFS_INODE_TABLE_SIZE    20
 #define MAX_INODES 		(int)floor((float)(SFS_INODE_TABLE_SIZE*SFS_API_BLOCK_SIZE) / (float)sizeof(Inode))
 #define SFS_NUM_DIRECT_PTR  	12
-#define SFS_MAX_FILENAME    	20
+#define SFS_MAX_FILENAME    	21
 //#define SFS_MAX_EXT         	3
 #define SFS_MAX_FDENTRIES   	1024
 #define EMPTY_BLOCK_LIST_SPACE 	(int)ceil((float)SFS_API_NUM_BLOCKS / (float)SFS_API_BLOCK_SIZE)
 #define FULL 					(char)1
 #define EMPTY 					(char)0
+#define ADD						(char)1
+#define REMOVE 					(char)0 
+#define NUM_INDIRECT_PTR		(int)floor((float)(SFS_API_BLOCK_SIZE - sizeof(int))/(float)sizeof(int))
 
 typedef struct{
 	int magic_number;
@@ -32,11 +35,6 @@ typedef struct{
 	int inode_table_length;
 	int root_dir_inode;
 } SuperBlock;
-
-typedef struct{
-	int count;
-	int *ptr;
-} IndirectionBlock;
 
 typedef struct{
 	mode_t mode;

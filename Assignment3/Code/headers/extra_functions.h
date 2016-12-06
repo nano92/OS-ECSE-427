@@ -26,8 +26,8 @@ int save_root_Inode(Inode **inode_table, SuperBlock **super_block,
 //int add_Inode(Inode **inode_table, Inode inode, int index);
 int save_Inode_table(Inode **inode_table);
 int update_root_dir(DirectoryEntry **root_dir, Inode **inode_table, 
-					SuperBlock **super_block, int *index, int *dir_index,
-															char *filename);
+						SuperBlock **super_block, int *index, int *dir_index, 
+                        	char *filename, char update);
 int get_root_dir(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block);
 int get_Inode_table(Inode **inode_table);
@@ -38,5 +38,12 @@ int get_file(DirectoryEntry **root_dir, DirectoryEntry **file, char *filename);
 int create_file(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block, DirectoryEntry **file, 
 						char *filename);
-
+int save_indirection_block(int **indirection_ptr, char **empty_block_list, 
+							Inode **inode_table, int inode);
+int get_indirection_block(int **indirection_ptr, Inode **inode_table, 
+							int inode);
+int save_data(char **empty_block_list, int offset,	char *buf, 
+				int space_to_fill);
+int get_last_block(Inode **inode_table, int iNode, int block_ptr, 
+					int *last_block, char **empty_block_list);
 #endif /* EXTRA_FUNCTIONS_H */

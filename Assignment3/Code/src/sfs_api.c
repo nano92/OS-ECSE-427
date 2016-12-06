@@ -2,13 +2,11 @@
 #include "extra_functions.h"
 
 SuperBlock *super_block;
-//InodeTable *inode_table;
 Inode *inode_table;
-//Directory *root_dir;
 DirectoryEntry *root_dir;
 FileDescriptorEntry *file_descriptor_table;
 char *empty_block_list;
-static int dir_current_pos = 0;
+static int dir_current_pos = 1;
 static int total_files = 0;
 
 void mksfs(int fresh){
@@ -23,8 +21,6 @@ void mksfs(int fresh){
 			exit(EXIT_FAILURE);
 		}
 
-		puts("init_fresh_disk()");
-
 		if(init_empty_block_list(&empty_block_list) < 0){
 			perror("init_empty_block_list() error");
 			exit(EXIT_FAILURE);
@@ -35,19 +31,18 @@ void mksfs(int fresh){
 			perror("init_Inode_table() error");
 			exit(EXIT_FAILURE);
 		}
-		puts("init_inode_table()");
+	
 		//Initialize Super block
 		if(init_super_block(&inode_table, &super_block) < 0){
 			perror("init_super_block() error");
 			exit(EXIT_FAILURE);
 		}
-		puts("init_super_block()");
+
 		//Update empty block list and set superblock block space to 1 (full)
 		if(update_empty_block_list(&empty_block_list, added_space, 1, (char)FULL) < 0){
 			perror("update_empty_block_list() error");
 			exit(EXIT_FAILURE);
 		}
-		//empty_block_list[added_space] = (char)1;
 		//Increase added_space by one since the super block only takes one block
 		added_space++;
 
@@ -57,9 +52,7 @@ void mksfs(int fresh){
 			perror("update_empty_block_list() error");
 			exit(EXIT_FAILURE);
 		}
-		/*for(int i = 0; i < SFS_INODE_TABLE_SIZE; i++) {
-            empty_block_list[added_space + i] = (char)1;
-        }*/
+		
         added_space += SFS_INODE_TABLE_SIZE;
 
         //Update empty blocka and set empty block list space to 1 (full)
@@ -69,12 +62,6 @@ void mksfs(int fresh){
 			exit(EXIT_FAILURE);
 		}
 
-        /*for(int i = 0; i < EMPTY_BLOCK_LIST_SPACE; i++) {
-            empty_block_list[added_space + i] = (char)1;
-        }*/
-
-        //added_space += EMPTY_BLOCK_LIST_SPACE;
-
 		//save root dir
 		if(save_root_dir(&inode_table, &super_block, &empty_block_list, 
 							&start_block, &num_blocks) < 0){
@@ -82,13 +69,11 @@ void mksfs(int fresh){
 			exit(EXIT_FAILURE);
 		}
 
-		puts("saved root_dir");
-
+		//Update root dir and inode table data structures in memory (local)
         if(get_root_dir(&root_dir, &inode_table, &super_block) < 0){
         	perror("get_root_dir() error");
 			exit(EXIT_FAILURE);
         }
-        puts("get_root_dir()");
 
 	}else{
 		
@@ -143,27 +128,18 @@ void mksfs(int fresh){
 		exit(EXIT_FAILURE);
 	}
 }
-/**
- * Gets the name of the next file in the root directory
- * This maintains a global variable that is incremented on each function call
- * @param fname The return buffer variable
- * @return 1 if file found, 0 if no more file in the directory
- */
-int sfs_get_next_file_name(char *fname){
-    //Get updated reference from root dir and other important structres from 
-  	//disk to memory
-  	if(get_root_dir(&root_dir, &inode_table, &super_block) < 0){
-        	perror("get_root_dir() error");
-			return -1;
-    }
 
-    if(dir_current_pos >= total_files) { 
-        return 0;
+int sfs_get_next_file_name(char *fname){
+    if(dir_current_pos == total_files + 1){
+    	dir_current_pos = 1;
+    	return 0;
     }
+   
     strcpy(fname, root_dir[dir_current_pos].filename);
-   	dir_current_pos++;
+    dir_current_pos++;
     return 1;
 }
+
 int sfs_get_file_size(char* path){
 	int size;
   	DirectoryEntry *file = malloc(sizeof(DirectoryEntry));
@@ -171,13 +147,7 @@ int sfs_get_file_size(char* path){
   		perror("file malloc error");
   		return -1;
   	} 
-
-  	//Get updated reference from root dir and other important structres from 
-  	//disk to memory
-  	if(get_root_dir(&root_dir, &inode_table, &super_block) < 0){
-        	perror("get_root_dir() error");
-			return -1;
-    }  	
+	
   	if(get_file(&root_dir, &file, path) < 0){
   		perror("get_file() erorr");
   		return -1;
@@ -187,37 +157,30 @@ int sfs_get_file_size(char* path){
   	
   	return size;
 }
+
 int sfs_fopen(char *name){
-	int fd_index;
+	int fd_index = -1;
 	//check the length of the file name
 	if(strlen(name) > SFS_MAX_FILENAME){
 		return -1;
 	}
 	 DirectoryEntry *file = malloc(sizeof(DirectoryEntry));
-	 //Get updated reference from root dir and other important structres from 
-  	//disk to memory
-  	// if(get_root_dir(&root_dir, &inode_table, &super_block) < 0){
-   //      	perror("get_root_dir() error");
-			// return -1;
-   //  }
-
+	
   	if(get_file(&root_dir, &file, name) < 0){
   		if(create_file(&root_dir, &inode_table, &super_block, &file, name) < 0){
   			perror("create_file() error");
   			return -1;
-  		}else{
-  			total_files++;
   		}
+  		//If a file is created, total files global counter is incremented
+  		total_files++;
   	}
-  	
-  	
-  	printf("inode index: %d\n", file->inode_index);
-  	//DirectoryEntry *file =  &(root_dir->entries[root_dir->count]);
-    // check if the file is already opened
+
+    //check if the file is already opened
     for(int i = 0; i < SFS_MAX_FDENTRIES; i++) {
-        if(file_descriptor_table[i].busy == 1 && 
-        	file_descriptor_table[i].iNode == file->inode_index){
-            printf("File %s is already open", file->filename);
+        if((file_descriptor_table[i].busy == 1) && 
+        		(file_descriptor_table[i].iNode == file->inode_index)){
+            
+            printf("File %s is already open\n", file->filename);
             return -1;
         }
     }
@@ -229,7 +192,7 @@ int sfs_fopen(char *name){
     }else{
     	file_descriptor_table[fd_index].busy = 1;
     	file_descriptor_table[fd_index].iNode = file->inode_index;
-    	//File is opened if append mode. Thus, the read pointer is set at the 
+    	//File is opened in append mode. Thus, the read pointer is set at the 
     	//beginning of the file and the write pointer at the end
     	file_descriptor_table[fd_index].read_ptr = 0;
     	file_descriptor_table[fd_index].write_ptr = 
@@ -241,18 +204,20 @@ int sfs_fopen(char *name){
 int sfs_fclose(int fileID){
  	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
+	if((fileID >= SFS_MAX_FDENTRIES) || (fileID < 0)){
 		printf("sfs_fclose() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
 	}else if(file_descriptor_table[fileID].busy == 0){
-		printf("sfs_fclose() error: Requested fd:%d is not assigned to an \
-				opened file\n",fileID);
+		printf("sfs_fclose() error: Requested fd:%d is not assigned to an opened file\n",fileID);
 		return -1;
 	}else{	
-		//Sets the requested file descriptr free to be used by another file.
+		//Sets the requested file descriptor free to be used by another file.
 		//This means that the file cannot longer be accessed for editing, thus 
 		//it is closed
+		file_descriptor_table[fileID].iNode = -69;
+        file_descriptor_table[fileID].read_ptr = -1;
+        file_descriptor_table[fileID].write_ptr = -1;
 		file_descriptor_table[fileID].busy = 0;
 		return 0;
 	}
@@ -260,6 +225,7 @@ int sfs_fclose(int fileID){
 int sfs_frseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
+	printf("read seek location: %d\n", loc );
 	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_frseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
@@ -267,41 +233,52 @@ int sfs_frseek(int fileID, int loc){
 	}else if(file_descriptor_table[fileID].busy == 0){
 		printf("sfs_frseek() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);		
+		return -1;
+	//Check if the requiered location is less than 0
+	}else if(loc < 0){
+		puts("sfs_frseek() error: location requiered is negative");
+		return -1;
+	//Check if the requiered location is greater than file size
+	}else if(loc > inode_table[file_descriptor_table[fileID].iNode].size){
+		puts("sfs_frseek() error: location requiered is greater than file size");
 		return -1;
 	}else{
 		//Move read pointer to desired location in the file
 		file_descriptor_table[fileID].read_ptr = loc;
 		return 0;
 	}
+	
 }
 int sfs_fwseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
-		printf("sfs_frseek() error: Requested fd: %d does not exist\n",fileID);
+	printf("write seek location: %d\n", loc );
+	if((fileID >= SFS_MAX_FDENTRIES) || (fileID < 0)){
+		printf("sfs_fwseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
 	}else if(file_descriptor_table[fileID].busy == 0){
-		printf("sfs_frseek() error: Requested fd:%d is not assigned to an \
+		printf("sfs_fwseek() error: Requested fd:%d is not assigned to an \
 				opened file\n",fileID);		
 		return -1;
+	//Check if the requiered location is less than 0
+	}else if(loc < 0){
+		puts("sfs_fwseek() error: location requiered is negative");
+		return -1;
+	//Check if the requiered location is greater than file size
+	}else if(loc > inode_table[file_descriptor_table[fileID].iNode].size){
+		puts("sfs_fwseek() error: location requiered is greater than file size");
+		return -1;
 	}else{
-		//Move write pointer to desired location in the file
+		//Move read pointer to desired location in the file
 		file_descriptor_table[fileID].write_ptr = loc;
 		return 0;
 	}
 }
 int sfs_fwrite(int fileID, char *buf, int length){
- /*
-	check if fid is in fileDescTable
-		if not return -1
-
-	block # = floor(wptr/1024) (size of block) //index of block to write to
-	block_added_space = wptr % size
- */
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
+	if((fileID >= SFS_MAX_FDENTRIES) || (fileID < 0)){
 		printf("sfs_fwrite() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
 	//check if the file descriptor is actually not being used	
@@ -310,108 +287,467 @@ int sfs_fwrite(int fileID, char *buf, int length){
 				opened file\n",fileID);		
 		return -1;
 	}
+	FileDescriptorEntry *fd = &(file_descriptor_table[fileID]);
+	
 	//check if there is enough space on disk to allocate requiered data
 	int free_blocks = get_remaining_empty_space(&empty_block_list);
-	int requiered_blocks = (int)ceil((float)(length/(float)SFS_API_BLOCK_SIZE));
-	printf("free blocks: %d, requiered blocks: %d\n", free_blocks, requiered_blocks);
-
-	if(free_blocks < 0 || (free_blocks < requiered_blocks)){
+	
+	int requiered_blocks = (int)((float)length/(float)SFS_API_BLOCK_SIZE);
+	
+	if(free_blocks < 0 || 
+		(free_blocks < requiered_blocks) || 
+			(requiered_blocks > 12 + NUM_INDIRECT_PTR)){
 		puts("sfs_fwrite() error: There is not enough space on disk");
 		return -1;
 	}
-
+	
 	int written_bytes = 0;
-	FileDescriptorEntry *fd = &(file_descriptor_table[fileID]);
-	printf("fd inode: %d\n", fd->iNode);
-	//First case:  write to an empty file
-	//check if file is empty
-	if((inode_table[fd->iNode]).size == 0){
-		//check if there are enough contiguous blocks to write 
-		//the requiered data
-		int start_block, num_blocks;
-		if(find_contiguous_empty_space(&empty_block_list,length, &start_block,
-										&num_blocks) < 0){
-			//Not enough contiguous blocks were find
-	    	//check if the data needs 12 blocks or more to be allocated
-	    	if(requiered_blocks <= 12){
-	    		int one_block = 1;
-	    		//Save the requiered data one block at a time
-	    		for(int i=0; i < requiered_blocks; i++){
-	    			//The start block will be the first empty block that can be found
-			    	start_block = find_first_empty_space(&empty_block_list);
-			    	if(start_block < 0){
-			    		return -1;	
-			    	}
-	    			char *temp_buf = malloc(requiered_blocks*SFS_API_BLOCK_SIZE);
-	    			if(temp_buf == NULL){
-	    				perror("temp_buf malloc error");
-	    				return -1;
-	    			}
-	    			memcpy(temp_buf, buf, length);
-	    			if(save_block(&empty_block_list, &start_block, &one_block, 
-	    							temp_buf+(i*SFS_API_BLOCK_SIZE)) < 0){
-	    				perror("save_block() error");
-	    				return -1;
-	    			}
-	    			inode_table[fd->iNode].direct_ptr[i] = start_block;
-	    			inode_table[fd->iNode].link_counter++;
-			    	free(temp_buf);
-	    		}
+	int check, last_block;
+	int one_block = 1;
+	int space_to_fill = 0;
 
-	    	}else{
-	    		//need to use indirect pointer
-	    	}
-
-    	}else{
-    		//Enough contiguous blocks were find
-    		//check if the data needs 12 blocks or more to be allocated
-	    	if(requiered_blocks <= 12){
-	    		char *temp_buf = malloc(requiered_blocks * SFS_API_BLOCK_SIZE);
-    			if(temp_buf == NULL){
-    				perror("temp_buf malloc error");
-    				return -1;
-    			}
-    			memcpy(temp_buf, buf, length);
-    			if(save_block(&empty_block_list, &start_block, &num_blocks, 
-    							temp_buf) < 0){
-    				perror("save_block() error");
-    				return -1;
-    			}
-    			for(int i=0; i < requiered_blocks; i++){
-    				inode_table[fd->iNode].direct_ptr[i] = start_block + i;
-    				inode_table[fd->iNode].link_counter++;
-    			}
-		    	free(temp_buf);
-	    	}else{
-	    		//need to use indirect pointer
-	    	}
-    	}
-    	//Check if last used block was filled completely. If it was, then 
-		//the written bytes is the full size of the requiered blocks. If it
-		//was not then then we only take into consideration the bytes 
-		//written to the last block plus the full size of the rest of them
-		int block_added_space = fd->write_ptr % SFS_API_BLOCK_SIZE;
-		if(block_added_space == 0){
-			inode_table[fd->iNode].size = requiered_blocks * SFS_API_BLOCK_SIZE;
-			
-		}else{
-			inode_table[fd->iNode].size = 
-					((requiered_blocks-1)*SFS_API_BLOCK_SIZE)+block_added_space;
-		}
-		written_bytes = inode_table[fd->iNode].size;
-		return written_bytes;
-
-	}else{
-		//File is not empty
+	if(length < 0){
+		puts("sfs_fwrite() error: buffer length is zero");
+		return -1;
 	}
 
-	return 0;
+	int block_ptr = (int)floor((float)fd->write_ptr / (float)SFS_API_BLOCK_SIZE);
+	int block_offset = fd->write_ptr % SFS_API_BLOCK_SIZE;
+	
+	
+	//Get index of last block used or index of a new empty block
+	if(get_last_block(&inode_table, fd->iNode, block_ptr, &last_block, 
+						&empty_block_list) < 0 ){
+		perror("get_last_block() error");
+		return -1;
+	}
+
+	if(block_offset > 0){
+		//Check if the data that will be written will bigger than than the space
+		//left on the block
+		if((block_offset + length) >  SFS_API_BLOCK_SIZE){
+			space_to_fill = SFS_API_BLOCK_SIZE - block_offset;
+		}else{
+			space_to_fill = length;
+		}
+
+		char *buffer = malloc(SFS_API_BLOCK_SIZE);
+		check = read_blocks(last_block, 1, buffer);
+		if(check <= 0){
+			perror("read_blocks() error");
+			return -1;
+		}
+		//Add amount of data to fill the block
+		memcpy(buffer + block_offset, buf, space_to_fill);
+		//Save last block to disk and updates the empty block list
+		if(save_block(&empty_block_list, &last_block, &one_block, buffer) < 0){
+			perror("save_block() error");
+			return -1;
+		}
+		free(buffer);
+
+		//Decrease length to write by the amount of bytes that we already 
+		//written
+		length -= space_to_fill;
+		//Increase buf, write pointer, written bytes by the amount of bytes 
+		//already written
+		buf += space_to_fill;
+		fd->write_ptr += space_to_fill;
+		written_bytes += space_to_fill;
+		//Recalculate requiered full blocks with updated length
+		requiered_blocks = (int)((float)length/(float)SFS_API_BLOCK_SIZE);
+	}
+		
+	if(length > 0){
+		for(int i=0; i < requiered_blocks; i++){
+			//Check if file needs to add a block to the indirect pointer list 
+			//and the indirect pointer block has no been initialized
+			if(inode_table[fd->iNode].link_counter >= 12 && 
+					inode_table[fd->iNode].indirect_ptr == -1){
+				//Get an empty block
+				inode_table[fd->iNode].indirect_ptr = 
+								find_first_empty_space(&empty_block_list);
+				if(inode_table[fd->iNode].indirect_ptr < 0){
+					perror("find_first_empty_space() error");
+					return -1;
+				}
+				//Init indirect pointer list with default values (-1), and save
+				//it to the disk
+				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
+				for(int i=0; i < NUM_INDIRECT_PTR; i++){
+					buffer_ind_ptr[i] = -1;
+				}
+				//Save indirection pointer block to the disk and update empty
+				//block list
+				if(save_block(&empty_block_list, 
+					inode_table[fd->iNode].indirect_ptr, 
+						&one_block, buffer_ind_ptr) < 0){
+					perror("save_block() error");
+					return -1;
+				}
+				free(buffer_ind_ptr);	
+			}
+			if(inode_table[fd->iNode].link_counter >= 12){
+				/*
+				Get indirection pointer block from disk, find an empty block and
+				added it to the indirection pointer list. Save the indirection 
+				pointer list back to its associated block
+				*/
+				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
+				check = read_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
+										buffer_ind_ptr);
+				if(check <= 0){
+					perror("read_blocks() error");
+					return -1;
+				}
+				last_block = find_first_empty_space(&empty_block_list);
+				if(last_block < 0){
+					perror("find_first_empty_space() error");
+					return -1;
+				}
+				buffer_ind_ptr[block_ptr -12] = last_block;
+				check = write_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
+							buffer_ind_ptr);
+				if(check <= 0){
+					perror("write_blocks() error");
+					return -1;
+				}
+				free(buffer_ind_ptr);
+			}else{
+				/*
+				Finds an empty block and add it to the direct pointer list
+				*/
+				last_block = find_first_empty_space(&empty_block_list);
+				if(last_block < 0){
+					perror("find_first_empty_space() error");
+					return -1;
+				}
+				inode_table[fd->iNode].direct_ptr[block_ptr] = last_block;
+			}
+
+			//Increase block pinter and link counter, since new blocks have been
+			//added to the direct pointer list or indirect pointer list
+			block_ptr++;
+			inode_table[fd->iNode].link_counter++;
+
+			//Get a whole block of data (1024 bytes) to the buffer and save it
+			char *buffer = malloc(SFS_API_BLOCK_SIZE);
+			memcpy(buffer, buf, SFS_API_BLOCK_SIZE);
+			
+			//Increase pointer to next position
+			buf += SFS_API_BLOCK_SIZE;
+			//Increase all data counter
+			fd->write_ptr += SFS_API_BLOCK_SIZE;
+			written_bytes += SFS_API_BLOCK_SIZE;
+			//Decrease the length by what have been written already
+			length -= SFS_API_BLOCK_SIZE;
+			
+			//Save buffer to memory and update empty block list
+			if(save_block(&empty_block_list, &last_block, &one_block, buffer) < 0){
+				perror("save_block() error");
+				return -1;
+			}
+			free(buffer);
+		}
+
+		//This parts handles the case where we have more data to save but is 
+		//less than a whole block size
+		if(length > 0){
+			char *buffer = malloc(SFS_API_BLOCK_SIZE);
+			int reminaing_data = length;
+
+			//Gets the next block to write the data to, either from direct or 
+			//indirect pointer list or an empty block
+			if(get_last_block(&inode_table, fd->iNode, block_ptr, 
+								&last_block, &empty_block_list) < 0){
+				perror("get_ptr() error");
+				return -1;
+			}
+		
+			check = read_blocks(last_block, 1, buffer);
+			if(check <= 0){
+				perror("read_blocks() error");
+			}
+			memcpy(buffer, buf, reminaing_data);
+			//Save buffer to memory and update empty block list
+			if(save_block(&empty_block_list, &last_block, &one_block, buffer) < 0){
+				perror("save_block() error");
+				return -1;
+			}
+			free(buffer);
+
+			fd->write_ptr += reminaing_data;
+			written_bytes += reminaing_data;				
+		}
+		
+	}
+	
+	inode_table[fd->iNode].size += written_bytes;
+
+	//Save updated inode table to the disk
+	if(save_Inode_table(&inode_table) < 0){
+		perror("save_Inode_table() error");
+		return -1;
+	}
+	//Update data structures from disk to memory
+	if(get_root_dir(&root_dir, &inode_table, &super_block) < 0){
+		perror("get_root_dir() error");
+		return -1;
+	}
+
+
+	return written_bytes;
+
 }
+
 int sfs_fread(int fileID, char *buf, int length){
-  return 0;
+	//check if the the file descriptor exists, since there is a fixed number of 
+	//file descriptors available
+	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
+		printf("sfs_fread() error: Requested fd: %d does not exist\n",fileID);
+		return -1;
+	//check if the file descriptor is actually not being used	
+	}else if(file_descriptor_table[fileID].busy == 0){
+		printf("sfs_fread() error: Requested fd:%d is not assigned to an \
+				opened file\n",fileID);		
+		return -1;
+	}
+	FileDescriptorEntry *fd = &(file_descriptor_table[fileID]);
+
+	if(length < 0){
+		puts("sfs_fread() error: Attempt to read a negative lenght");
+		return -1;
+	}else if(inode_table[fd->iNode].size == 0){
+		puts("sfs_fread() error: Attempt to read to an empty file");
+		return -1;
+	}
+	
+	//If user tries to read a greater length than the file size, the amount of
+	//bytes read get truncated at file size
+	int read_length;
+	if(length > inode_table[fd->iNode].size){
+		read_length = inode_table[fd->iNode].size;
+	}else{
+		read_length = length;
+	}
+	
+	int block_ptr = (int)floor((float)fd->read_ptr / (float)SFS_API_BLOCK_SIZE);;
+	int block_offset = fd->read_ptr % SFS_API_BLOCK_SIZE;
+
+	int read_bytes = 0;
+	int check, block_to_read;
+	int data_to_read = 0;
+
+	//Get index of last block used or index of a new empty block
+	if(get_last_block(&inode_table, fd->iNode, block_ptr, &block_to_read, 
+						&empty_block_list) < 0 ){
+		perror("get_last_block() error");
+		return -1;
+	}
+
+	if(block_offset > 0){
+		//Assure to read sufficient amount of bytes for first block
+		if(block_offset + read_length > SFS_API_BLOCK_SIZE){
+			data_to_read = SFS_API_BLOCK_SIZE - block_offset;
+		}else{
+			data_to_read = read_length;
+		}
+	
+		//Get first block to be read and copy the contents specified to a buffer
+		char *buffer = malloc(SFS_API_BLOCK_SIZE);
+		check = read_blocks(block_to_read, 1, buffer);
+		if(check <= 0){
+			perror("read_blocks() error");
+			return -1;
+		}
+		memcpy(buf, buffer + block_offset, data_to_read);
+		free(buffer);
+
+		//Update the lenght to be read by the amount of what have been read 
+		//already
+		read_length -= data_to_read;
+		//Increase all data counters
+		fd->read_ptr += data_to_read;
+		read_bytes += data_to_read;
+		//Increase data buffer pointer to save data at the next available 
+		//location
+		buf += data_to_read;
+		//Increse block pointer and set block offset to 0
+		block_ptr++;
+		block_offset = 0;
+	}
+
+	int requiered_blocks = (int)((float)read_length / (float)SFS_API_BLOCK_SIZE);
+		
+	if(read_length > 0){
+		for(int i=0; i < requiered_blocks; i++){
+			if(block_ptr >= 12){
+				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
+				check = read_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
+										buffer_ind_ptr);
+				if(check <= 0){
+					perror("read_blocks() error");
+					return -1;
+				}
+				block_to_read = buffer_ind_ptr[block_ptr -12];
+				free(buffer_ind_ptr);
+			}else{
+				//printf("blocks_read: %d\n", block_ptr );
+				block_to_read = inode_table[fd->iNode].direct_ptr[block_ptr];
+			}
+
+			//get last block
+			char *buffer = malloc(SFS_API_BLOCK_SIZE);
+			check = read_blocks(block_to_read, 1, buffer);
+			if(check <= 0){
+				perror("read_blocks() error");
+				return -1;
+			}
+			//Add data to the last block
+			memcpy(buf, buffer, SFS_API_BLOCK_SIZE);
+			free(buffer);
+
+			read_length -= SFS_API_BLOCK_SIZE;
+			fd->read_ptr += SFS_API_BLOCK_SIZE;
+			read_bytes += SFS_API_BLOCK_SIZE;
+			block_ptr++;
+			
+			buf += SFS_API_BLOCK_SIZE;
+			
+		}
+
+		if(read_length > 0){
+			int reminaing_data = read_length;
+			//block_ptr = (int)floor((float)fd->write_ptr / (float)SFS_API_BLOCK_SIZE);
+
+			if(block_ptr >= 12){
+				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
+				check = read_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
+										buffer_ind_ptr);
+				if(check <= 0){
+					perror("read_blocks() error");
+					return -1;
+				}
+				block_to_read = buffer_ind_ptr[block_ptr -12];
+				free(buffer_ind_ptr);
+			}else{
+				//printf("blocks_read: %d\n", block_ptr );
+				block_to_read = inode_table[fd->iNode].direct_ptr[block_ptr];
+			}
+			
+			char *buffer = malloc(SFS_API_BLOCK_SIZE);
+			check = read_blocks(block_to_read, 1, buffer);
+			if(check <= 0){
+				perror("read_blocks() error");
+			}
+			memcpy(buf, buffer, reminaing_data);
+			check = write_blocks(block_to_read, 1, buffer);
+			if(check <= 0){
+				perror("read_blocks() error");
+			}
+			free(buffer);
+			
+			fd->read_ptr += reminaing_data;
+			read_bytes += reminaing_data;
+			read_length -= reminaing_data;
+			buf += reminaing_data;	
+		}
+
+	}
+		
+		printf("read bytes: %d, buf:%d, read_ptr:%d\n", read_bytes, strlen(buf), fd->read_ptr);
+		//printf("Start-- after reading\n");
+		//int counter = 0;
+		//printf("buf: %s\n", buf );
+		//printf("--Done printing %d characters--after reading\n",counter);
+		//free(buffer);
+
+		return read_bytes;
 }
+/*
+
+*/
 int sfs_remove(char *file){
-  return 0;
+	DirectoryEntry *file_entry = malloc(sizeof(DirectoryEntry));
+	int *indirection_ptr = 0;
+	
+ 	//Check if file exists
+ 	if(get_file(&root_dir, &file_entry, file) < 0){
+ 		puts("sfs_remove() error: requested file does not exist");
+ 		return -1;
+ 	}
+
+ 	//Get file index at root directory
+ 	int file_index;
+ 	int default_inode_index = -1;
+ 	for(int i=0; i < MAX_INODES; i++){
+ 		if(strncmp(file, root_dir[i].filename, SFS_MAX_FILENAME + 1) == 0){
+ 			file_index = i;
+ 			break;
+ 		}
+ 	}
+
+ 	//Close the file if it is opened
+ 	for(int i=0; i < SFS_MAX_FDENTRIES; i++){
+ 		if(file_descriptor_table[i].iNode == file_entry->inode_index){
+ 			int check = sfs_fclose(i);
+		 	if(check < 0){
+		 		puts("File was already closed");
+		 	}
+		 	break;
+ 		}
+ 	}
+
+ 	//Remove file from root directory
+ 	if(update_root_dir(&root_dir, &inode_table, &super_block, 
+ 						&default_inode_index, &file_index, '\0', REMOVE) < 0){
+ 		perror("update_root_dir() error");
+ 		return -1;
+ 	}
+
+ 	//Remove all reference to allocated blocks for the file. It is faster to set
+ 	//all of its blocks to "free" than actually erase the data. New data will 
+ 	//override it
+ 	for(int i=0; i < inode_table[file_entry->inode_index].link_counter; i++){
+ 		if(i >= 12){
+ 			if(indirection_ptr == 0){
+ 				if(get_indirection_block(&indirection_ptr,&inode_table, 
+ 											file_entry->inode_index)< 0){
+					perror("get_indirection_block() error");
+					return -1;
+				}
+ 			}
+ 			//Get indirect pointer
+ 			if(update_empty_block_list(&empty_block_list, indirection_ptr[i], 
+ 										1, EMPTY) < 0){
+	 			perror("update_empty_block_list() errror");
+	 			return -1;
+ 			}
+ 		}
+ 		
+ 		if(update_empty_block_list(&empty_block_list, 
+ 							inode_table[file_entry->inode_index].direct_ptr[i], 
+ 								1, EMPTY) < 0){
+ 			perror("update_empty_block_list() errror");
+ 			return -1;
+ 		}
+ 	}
+
+ 	//Reset file iNode
+ 	inode_table[file_entry->inode_index].mode = 0;
+	inode_table[file_entry->inode_index].size = 0;
+	inode_table[file_entry->inode_index].link_counter = 0;
+	inode_table[file_entry->inode_index].indirect_ptr = -1;
+	memset(inode_table[file_entry->inode_index].direct_ptr, -1, 12); 
+
+	if(save_Inode_table(&inode_table) < 0){
+		perror("save_Inode_table() error");
+		return -1;
+	}	
+
+	total_files--;
+
+ 	return 1;
 }
 
 /*
@@ -431,14 +767,14 @@ for(int i=0; i< #blocks; i++)
 fullBLockstoWriteTo = floor((toalLength - #ofbiytesThatSavedInFirstblock)/1024)
 */
 
-int main(){
+/*int main(){
 	mksfs(1);
 	
 	int fd = sfs_fopen("test_file");
 	printf("%d\n", inode_table[file_descriptor_table[fd].iNode].size );
-	char *buff = "test";
-	int wrt = sfs_fwrite(fd, buff, strlen(buff) + 1);
+	char *buff = calloc(200000, sizeof(char));
+	int wrt = sfs_fwrite(fd, buff, 200000);
 	printf("written: %d\n", wrt);
 	return 1;
 
-}
+}*/

@@ -3,7 +3,7 @@
 # To compile with test2, make test2
 
 HEADERS = -I headers/
-SOURCES= disk_emu.c sfs_api.c extra_functions.c 
+SOURCES= disk_emu.c sfs_api.c extra_functions.c fuse_wrappers.c
 OBJECTS_SOURCES= $(addprefix objects/, $(SOURCES:.c=.o))
 SOURCES_TEST1= disk_emu.c extra_functions.c sfs_api.c sfs_test1.c tests.c
 SOURCES_TEST2= disk_emu.c extra_functions.c sfs_api.c sfs_test2.c tests.c
@@ -22,8 +22,8 @@ all: $(SOURCES_PREFIX)
 test1: $(SOURCES_TEST1_PREFIX) 
 	$(CC) -o $(EXECUTABLE) $(SOURCES_TEST1_PREFIX) -lm
 
-test2: $(SOURCES_TEST2)
-	$(CC) -o $(EXECUTABLE) $(SOURCES_TEST2)
+test2: $(SOURCES_TEST2_PREFIX)
+	$(CC) -o $(EXECUTABLE) $(SOURCES_TEST2_PREFIX) -lm
 
 fuse:  $(OBJECTS_SOURCES) 
 	$(CC) -o $(EXECUTABLE) $^ $(LDFLAGS)
@@ -37,8 +37,8 @@ objects/extra_functions.o: src/extra_functions.c headers/extra_functions.h
 objects/sfs_api.o: src/sfs_api.c headers/sfs_api.h
 	$(CC) -c $< -o $@
 
-#objects/fuse_wrappers.o: src/fuse_wrappers.c
-	#$(CC) -c $< -o $@
+objects/fuse_wrappers.o: src/fuse_wrappers.c
+	$(CC) -c $< -o $@
 
 clean:
 	rm objects/*.o
