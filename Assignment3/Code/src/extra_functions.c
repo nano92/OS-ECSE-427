@@ -1,6 +1,14 @@
+/*
+Author: Luis Gallet Zambrano
+Id: 260583750
+Date: 05/12/2016
+*/
+
 #include "extra_functions.h"
 
-
+/*
+Initialize empty block list and set al elements to free (0)
+*/
 int init_empty_block_list(char **empty_block_list){
 	//initialize empty block list and set values to 0 (empty)
 	*empty_block_list = (char*)malloc(SFS_API_NUM_BLOCKS * sizeof(char));
@@ -16,11 +24,8 @@ int init_empty_block_list(char **empty_block_list){
 	}
 	return 1;
 }
-/**
- * Persists the free block list data structure on the disk
- * 
- * Basic algorithm:
- *   Free block list is stored as a (char) array of length = number of blocks
+/*
+Save empty block list to the disk
  */
 int save_empty_block_list(char **empty_block_list){
     int check;
@@ -31,8 +36,7 @@ int save_empty_block_list(char **empty_block_list){
     	return -1;
     }
 
-    check = write_blocks(1 + SFS_INODE_TABLE_SIZE, 1, 
-    					buff_empty_block);
+    check = write_blocks(1 + SFS_INODE_TABLE_SIZE, 1, buff_empty_block);
     if(check <= 0){
     	perror("write_blocks error");
     	return -1;
@@ -43,12 +47,8 @@ int save_empty_block_list(char **empty_block_list){
     return 1;
 }
 
-/**
- * Reads the free block list data structure from the disk to main memory
- * 
- * Basic algorithm:
- *   Free block list is stored as a (char) array of length = number of blocks
- *   Read as a whole block (no iteration)
+/*
+Get empty block list from disk
  */
 int get_empty_block_list(char **empty_block_list){
     int check;
@@ -65,14 +65,12 @@ int get_empty_block_list(char **empty_block_list){
     return 1;
 }
 
+/*
+Update the empty block list by setting the required block to empty(0) or full(1)
+Save it back to the disk, gets a fresh reference to memory(local)
+*/
 int update_empty_block_list(char **empty_block_list, int start_block, 
-								int num_blocks, char status){
-	//Ensure to get the last version on disk
-	if(get_empty_block_list(empty_block_list) < 0){
-		perror("get_empty_block_list() error");
-		return -1;
-	}
-	
+								int num_blocks, char status){	
 	//Update empty block list values
 	for(int i = start_block; i < (start_block + num_blocks); i++){
 		(*empty_block_list)[i] = status;
@@ -93,7 +91,7 @@ int update_empty_block_list(char **empty_block_list, int start_block,
 }
 
 /*
- * Initializes the inode table data structure (in mem)
+Initializes the inode table data structure to default values
  */
 int init_Inode_table(Inode **inode_table){
 	*inode_table = malloc((MAX_INODES+1) * sizeof(Inode));
@@ -116,11 +114,8 @@ int init_Inode_table(Inode **inode_table){
     return 1;
 }
 
-/**
- * Finds the next available inode index
- * Returns the first free available inode index
- * @param inode_index Ptr to return variable
- * @return -1 if no space found , 1 if found
+/*
+Find the next available inode by checking the entire table
  */
 int next_available_inode(Inode **inode_table, int *inode_index){
     for(int i = 0; i < MAX_INODES; i++) {
@@ -133,6 +128,9 @@ int next_available_inode(Inode **inode_table, int *inode_index){
     return -1;
 }
 
+/*
+Find the next available directory entry in the entire directory
+*/
 int next_available_dir_entry(DirectoryEntry **root_dir, int *dir_index){
     for(int i = 1; i < MAX_INODES + 1; i++) {
     //inode index -1 is the default value  
@@ -144,6 +142,9 @@ int next_available_dir_entry(DirectoryEntry **root_dir, int *dir_index){
     return -1;
 }
 
+/*
+Init super block data structure. It finds and sets the root inode as well
+*/
 int init_super_block(Inode **inode_table, SuperBlock **super_block){
 	int check, root_inode_index;
 	if(next_available_inode(inode_table, &root_inode_index) < 0){
@@ -167,7 +168,7 @@ int init_super_block(Inode **inode_table, SuperBlock **super_block){
     (*super_block)->inode_table_length = SFS_INODE_TABLE_SIZE;
     (*super_block)->root_dir_inode = root_inode_index;
      
-    memcpy(buff_superblock, *super_block, sizeof(SuperBlock));    // magic
+    memcpy(buff_superblock, *super_block, sizeof(SuperBlock));    
     check = write_blocks(0, 1, buff_superblock);
     if (check <= 0){
     	perror("write_blocks failed");
@@ -177,7 +178,10 @@ int init_super_block(Inode **inode_table, SuperBlock **super_block){
 
     return 1;
 }
-
+/*
+Gets total amount of contiguous blocks found that will suffice for the amount
+of byte requested. It sets the start block and the number of contiguous blocks
+*/
 int find_contiguous_empty_space(char **empty_block_list, int size_to_allocate, 
 						int *start_block, int *num_blocks){
     
@@ -186,14 +190,13 @@ int find_contiguous_empty_space(char **empty_block_list, int size_to_allocate,
     int blocks_quantity = (int)ceil((float)size_to_allocate / 
     					(float)SFS_API_BLOCK_SIZE);
     
-    // Loops through all blocks
     for(int i = 0; i < SFS_API_NUM_BLOCKS; i++){
         full = (*empty_block_list)[i];
-        // Checks for available index
+        //Get block and checks if its empty
         if(full == 0){
             bool_t flag = true;
             int j = i;
-            // Looping from first free index to free index + required length
+            //Check if there are enough empty blocks from the start point
             while(flag && (j < (i + blocks_quantity))){
                 together = (*empty_block_list)[j];
                 if (together == 0){
@@ -203,9 +206,9 @@ int find_contiguous_empty_space(char **empty_block_list, int size_to_allocate,
                 }
                 j++;
             }
-            // if taken , all needed space was free
+            //If flag is true, there is enough contiguous blocks to allocate 
+            //data
             if(flag){
-            	// Set values
                 *start_block = i;
                 *num_blocks = blocks_quantity;
                 return 1;
@@ -226,9 +229,7 @@ int find_first_empty_space(char **empty_block_list){
 			return i;
 		}
 	}
-
 	return -1;
-
 }
 /*
 Comparator function to be used by quick sort method
@@ -269,20 +270,10 @@ int get_remaining_empty_space(char **empty_block_list){
 	free(temp_empty_block_list);
 
 	return count;
-	/*for(int i=0; i < SFS_API_NUM_BLOCKS; i++){
-		if(temp_empty_block_list[i] == 0){
-			count++;
-		}
-	}*/
 }
 
-/**
- * Main method to allocate block of data on the disk. This method makes sure to
- * flag block used by the allocation as used in the free block list as well as
- * persisting data from buffer in main memory.
- * @param start_block the disk block to start from
- * @param nblocks the number of block to write 
- * @param buff the actual buffer containing data
+/*
+Method to save a block into the disk, it updates the empty block list as well
  */
 int save_block(char **empty_block_list, int *start_block, int *num_blocks,
 				 void *buffer){
@@ -298,19 +289,12 @@ int save_block(char **empty_block_list, int *start_block, int *num_blocks,
     	perror("update_empty_block_list() error");
     	return -1;
     }
-
-    /*for(int i = *start_block; i < (*start_block + *num_blocks); i++){
-        (*empty_block_list)[i] = 1;
-    }
-    
-    if(save_empty_block_list(empty_block_list) < 0){
-    	fprintf(stderr, "save_empty_block_list() failed\n");
-    	return -1;
-    }*/
-
     return 1;
 }
 
+/*
+Initialize the root inode and save the inode table to the disks
+*/
 int save_root_Inode(Inode **inode_table, SuperBlock **super_block,
 					int *start_block, int *num_blocks){
     //Initialize root directory Inode
@@ -332,8 +316,10 @@ int save_root_Inode(Inode **inode_table, SuperBlock **super_block,
     return 1;
 }
 
-int set_new_Inode(Inode **inode_table, int *index){
-	//init new file inode    
+/*
+Initialize a new inode by finding an empty one and setting up its mode
+*/
+int set_new_Inode(Inode **inode_table, int *index){  
     if(next_available_inode(inode_table, index) < 0){
     	perror("next_available_inode() error");
     	return -1;
@@ -346,33 +332,10 @@ int set_new_Inode(Inode **inode_table, int *index){
     }
     return 1;
 }
-/**
- * Save the inode at a given index, maintain the free_inodes char array list
- * up to date
- * @param inode the inode to be stored
- * @param index the index
- 
-int add_Inode(InodeTable **inode_table, Inode inode, int index){
-    (*inode_table)->allocated_count++;
-    (*inode_table)->free_inodes[index] = (char)1;
-    (*inode_table)->inodes[index] = inode;
-    
-    if(save_Inode_table(inode_table) < 0){
-    	perror("save_inode_table() failed");
-    	return -1;
-    }else{
-    	return 1;
-    }
-}*/
 
-/**
- * Persists the inode table data structure on the disk
- * 
- * Basic algorithm: 
- *   The inode table is stored on the disk with its inodes entries 
- *      Iterate over the free_inode table, for each used inode store it on disk
- *      at its corresponding position
- */
+/*
+Save inode table to the disk
+*/
 int save_Inode_table(Inode **inode_table){
 	int check;
    	Inode *buffer_iTable = malloc(SFS_INODE_TABLE_SIZE * 
@@ -391,6 +354,10 @@ int save_Inode_table(Inode **inode_table){
     free(buffer_iTable);
     return 1;
 }
+/*
+Function to save the root directory. It find sufficient blocks to save it and
+init to default values all of its possible entries
+*/
 int save_root_dir(Inode **inode_table, SuperBlock **super_block, 
 					char **empty_block_list, int *start_block, int *num_blocks){
 	//Get quantity of contiguous empty blocks necessary to save root Directory
@@ -429,12 +396,14 @@ int save_root_dir(Inode **inode_table, SuperBlock **super_block,
     return 1;
 }
 
+/*
+Add a new entry to the root directory, or remove on (set entry to default 
+values)and save it to the disk
+*/
 int update_root_dir(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block, int *index, int *dir_index, 
                         char *filename, char update){
 
-	
-	//Directory entries needs to be increased since there is a new file
 	Inode *root = &((*inode_table)[(*super_block)->root_dir_inode]);
 	DirectoryEntry *buff_root_dir = (DirectoryEntry *)malloc(MAX_INODES*
                                                         sizeof(DirectoryEntry));
@@ -457,7 +426,6 @@ int update_root_dir(DirectoryEntry **root_dir, Inode **inode_table,
 
     memcpy(buff_root_dir, (*root_dir), MAX_INODES * sizeof(DirectoryEntry));
 
-	
 	int check = write_blocks(root->direct_ptr[0], root->link_counter, 
 								buff_root_dir);
 	if(check <= 0){
@@ -476,19 +444,14 @@ int update_root_dir(DirectoryEntry **root_dir, Inode **inode_table,
 }
 
 /**
- * Reads the root directory entry from the disk to the main memory
- * - Finds the root inode
- * - Reads the datablock contents from 0 to allocated_ptr (root directory could
- *   span over multiple blocks)
- * - For each root entry, read name & extension
+Get root directory reference from disk to memory(local). It get the inode table
+as well
  */
 int get_root_dir(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block){
 	int check;
 
     if((*root_dir) != 0){
-    	
-		//free((*root_dir)->entries); 
 		//Free reference of root dir in memory to get one fresh from disk
 		free(*root_dir); 
     }
@@ -499,7 +462,7 @@ int get_root_dir(DirectoryEntry **root_dir, Inode **inode_table,
     }
     
     Inode *root = &((*inode_table)[(*super_block)->root_dir_inode]);
-    // read the whole root directory block(s) in the buffer
+    //read the whole root directory block(s) in the buffer
     DirectoryEntry *buff_root_dir = (DirectoryEntry *)malloc(root->link_counter 
                                                         * SFS_API_BLOCK_SIZE);
     
@@ -524,15 +487,14 @@ int get_root_dir(DirectoryEntry **root_dir, Inode **inode_table,
     return 1;
 }
 
-/**
- * Reads the inode table from the disk to main memory
+/*
+Gets the inode table from disk to memory(local)
  */
 int get_Inode_table(Inode **inode_table){
     int check;
     
     if((*inode_table) != 0){
-		//free((*inode_table)->inodes);
-		//free((*inode_table)->free_inodes);
+    	//Free reference of inode table in memory to get one fresh from disk
 		free(*inode_table);
 	}
     
@@ -563,8 +525,9 @@ int get_Inode_table(Inode **inode_table){
     return 1;
 }
 
-/**
- * Initializes the file descriptor table data structure (in mem)
+/*
+Initializes the file descriptor table data structure in memory to its default 
+values
  */
 int init_FD_table(FileDescriptorEntry **fd_table){
     *fd_table = malloc(SFS_MAX_FDENTRIES * sizeof(FileDescriptorEntry));
@@ -584,11 +547,8 @@ int init_FD_table(FileDescriptorEntry **fd_table){
     return 1;
 }
 
-/**
- * Finds the next available file descriptor index
- * Returns the first free available file descriptor index
- * @param fd_index Ptr to return variable
- * @return -1 if no fd entry avail, 1 if found
+/*
+Finds the next available fd in the table
  */
 int next_available_fd(FileDescriptorEntry **file_descriptor_table, 
 						int *fd_index){
@@ -602,6 +562,9 @@ int next_available_fd(FileDescriptorEntry **file_descriptor_table,
     return -1;
 }
 
+/*
+Get file from root directory if its found
+*/
 int get_file(DirectoryEntry **root_dir, DirectoryEntry **file, char *filename){
 
     for(int i=0; i < MAX_INODES; i++){
@@ -615,7 +578,7 @@ int get_file(DirectoryEntry **root_dir, DirectoryEntry **file, char *filename){
 
 /*
 Set Inode of the new file and updates the Inode Table. 
-A new entry is added to the root directory and it is updated to the disk
+A new entry is added to the root directory and it is updated in the disk
 */
 int create_file(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block, DirectoryEntry **file,
@@ -638,34 +601,10 @@ int create_file(DirectoryEntry **root_dir, Inode **inode_table,
 	
 	return 1;
 }
-//Allocates a block for the inode indirection block, set block number in the 
-//inode
-int save_indirection_block(int **indirection_ptr, char **empty_block_list, 
-							Inode **inode_table, int inode){
-	int one_block = 1;
-	
-	*indirection_ptr = calloc(NUM_INDIRECT_PTR, sizeof(int));
-	if(*indirection_ptr == NULL){
-		perror("indirection_ptr calloc error");
-		return -1;
-	}
-	//find a block for indirect pointer array
-	int indirect_block = 
-				find_first_empty_space(empty_block_list);
-	(*inode_table)[inode].indirect_ptr = indirect_block;
-	int *buff_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
-	memcpy(buff_ind_ptr, *indirection_ptr, 
-							NUM_INDIRECT_PTR * sizeof(int));
-	if(save_block(empty_block_list, &indirect_block,
-					&one_block,	buff_ind_ptr) < 0){
-		perror("save_block() error");
-		return -1;
-	}
-	free(buff_ind_ptr);
 
-	return 1;
-}
-
+/*
+Get indirection block list from the disk
+*/
 int get_indirection_block(int **indirection_ptr, Inode **inode_table, 
 							int inode){
 	int check;
@@ -684,30 +623,12 @@ int get_indirection_block(int **indirection_ptr, Inode **inode_table,
 	return 1;
 	
 }
-//Save requiered data one block at a time. Returns the number of the allocated 
-//block or a -1 if it fails
-int save_data(char **empty_block_list, int offset,	char *buf, 
-				int space_to_fill){
-	int one_block = 1;
-	int start_block = find_first_empty_space(empty_block_list);
-	if(start_block < 0){
-		return -1;	
-	}
-	char *temp_buf = malloc(SFS_API_BLOCK_SIZE);
-	if(temp_buf == NULL){
-		perror("temp_buf malloc error");
-		return -1;
-	}
-	memcpy(temp_buf, buf + offset, space_to_fill);
-	if(save_block(empty_block_list, &start_block, &one_block, temp_buf) < 0){
-		perror("save_block() error");
-		return -1;
-	}
-	free(temp_buf);
 
-	return start_block;
-}
-
+/*
+This function gets the requiered block from the indirect pointer list or from 
+the direct pointer list. If the block pointer points to a position that does 
+not have a block, the one empty block is found and the lists are updated
+*/
 int get_last_block(Inode **inode_table, int iNode, int block_ptr, int *last_block, char **empty_block_list){
 	int check;
 	if(block_ptr >= 12){

@@ -1,3 +1,9 @@
+/*
+Author: Luis Gallet Zambrano
+Id: 260583750
+Date: 05/12/2016
+*/
+
 #ifndef EXTRA_FUNCTIONS_H
 
 #include "sfs_api.h"
@@ -38,12 +44,8 @@ int get_file(DirectoryEntry **root_dir, DirectoryEntry **file, char *filename);
 int create_file(DirectoryEntry **root_dir, Inode **inode_table, 
 					SuperBlock **super_block, DirectoryEntry **file, 
 						char *filename);
-int save_indirection_block(int **indirection_ptr, char **empty_block_list, 
-							Inode **inode_table, int inode);
 int get_indirection_block(int **indirection_ptr, Inode **inode_table, 
 							int inode);
-int save_data(char **empty_block_list, int offset,	char *buf, 
-				int space_to_fill);
 int get_last_block(Inode **inode_table, int iNode, int block_ptr, 
 					int *last_block, char **empty_block_list);
 #endif /* EXTRA_FUNCTIONS_H */

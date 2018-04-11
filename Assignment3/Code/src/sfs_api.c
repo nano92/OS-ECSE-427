@@ -1,3 +1,9 @@
+/*
+Author: Luis Gallet Zambrano
+Id: 260583750
+Date: 05/12/2016
+*/
+
 #include "sfs_api.h"
 #include "extra_functions.h"
 
@@ -225,7 +231,6 @@ int sfs_fclose(int fileID){
 int sfs_frseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	printf("read seek location: %d\n", loc );
 	if(fileID >= SFS_MAX_FDENTRIES || fileID < 0){
 		printf("sfs_frseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
@@ -252,7 +257,6 @@ int sfs_frseek(int fileID, int loc){
 int sfs_fwseek(int fileID, int loc){
 	//check if the the file descriptor exists, since there is a fixed number of 
 	//file descriptors available
-	printf("write seek location: %d\n", loc );
 	if((fileID >= SFS_MAX_FDENTRIES) || (fileID < 0)){
 		printf("sfs_fwseek() error: Requested fd: %d does not exist\n",fileID);
 		return -1;
@@ -380,7 +384,7 @@ int sfs_fwrite(int fileID, char *buf, int length){
 				//Save indirection pointer block to the disk and update empty
 				//block list
 				if(save_block(&empty_block_list, 
-					inode_table[fd->iNode].indirect_ptr, 
+					&(inode_table[fd->iNode].indirect_ptr), 
 						&one_block, buffer_ind_ptr) < 0){
 					perror("save_block() error");
 					return -1;
@@ -576,11 +580,12 @@ int sfs_fread(int fileID, char *buf, int length){
 		block_ptr++;
 		block_offset = 0;
 	}
-
+	//Amount of full blocks to read
 	int requiered_blocks = (int)((float)read_length / (float)SFS_API_BLOCK_SIZE);
 		
 	if(read_length > 0){
 		for(int i=0; i < requiered_blocks; i++){
+			//Get block of indirect pointer list of from direct pointer list
 			if(block_ptr >= 12){
 				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
 				check = read_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
@@ -592,34 +597,35 @@ int sfs_fread(int fileID, char *buf, int length){
 				block_to_read = buffer_ind_ptr[block_ptr -12];
 				free(buffer_ind_ptr);
 			}else{
-				//printf("blocks_read: %d\n", block_ptr );
 				block_to_read = inode_table[fd->iNode].direct_ptr[block_ptr];
 			}
-
-			//get last block
+			//Get block from disk
 			char *buffer = malloc(SFS_API_BLOCK_SIZE);
 			check = read_blocks(block_to_read, 1, buffer);
 			if(check <= 0){
 				perror("read_blocks() error");
 				return -1;
 			}
-			//Add data to the last block
+			//Add one whole block of data to the buffer
 			memcpy(buf, buffer, SFS_API_BLOCK_SIZE);
 			free(buffer);
 
+			//Decrease lennght to be read by whole block size amount
 			read_length -= SFS_API_BLOCK_SIZE;
+			//increase data counters
 			fd->read_ptr += SFS_API_BLOCK_SIZE;
 			read_bytes += SFS_API_BLOCK_SIZE;
+			//Increment block pointer
 			block_ptr++;
-			
+			//Increment buffer to save read data at next available location
 			buf += SFS_API_BLOCK_SIZE;
 			
 		}
 
+		//Case where theres is still data to read but it is less than a whole
+		//block size
 		if(read_length > 0){
 			int reminaing_data = read_length;
-			//block_ptr = (int)floor((float)fd->write_ptr / (float)SFS_API_BLOCK_SIZE);
-
 			if(block_ptr >= 12){
 				int *buffer_ind_ptr = malloc(SFS_API_BLOCK_SIZE);
 				check = read_blocks(inode_table[fd->iNode].indirect_ptr, 1, 
@@ -631,22 +637,18 @@ int sfs_fread(int fileID, char *buf, int length){
 				block_to_read = buffer_ind_ptr[block_ptr -12];
 				free(buffer_ind_ptr);
 			}else{
-				//printf("blocks_read: %d\n", block_ptr );
 				block_to_read = inode_table[fd->iNode].direct_ptr[block_ptr];
 			}
 			
+			//Get next block to read from
 			char *buffer = malloc(SFS_API_BLOCK_SIZE);
 			check = read_blocks(block_to_read, 1, buffer);
 			if(check <= 0){
 				perror("read_blocks() error");
 			}
 			memcpy(buf, buffer, reminaing_data);
-			check = write_blocks(block_to_read, 1, buffer);
-			if(check <= 0){
-				perror("read_blocks() error");
-			}
 			free(buffer);
-			
+
 			fd->read_ptr += reminaing_data;
 			read_bytes += reminaing_data;
 			read_length -= reminaing_data;
@@ -654,19 +656,10 @@ int sfs_fread(int fileID, char *buf, int length){
 		}
 
 	}
-		
-		printf("read bytes: %d, buf:%d, read_ptr:%d\n", read_bytes, strlen(buf), fd->read_ptr);
-		//printf("Start-- after reading\n");
-		//int counter = 0;
-		//printf("buf: %s\n", buf );
-		//printf("--Done printing %d characters--after reading\n",counter);
-		//free(buffer);
-
-		return read_bytes;
+	
+	return read_bytes;
 }
-/*
 
-*/
 int sfs_remove(char *file){
 	DirectoryEntry *file_entry = malloc(sizeof(DirectoryEntry));
 	int *indirection_ptr = 0;
@@ -717,12 +710,24 @@ int sfs_remove(char *file){
 					return -1;
 				}
  			}
- 			//Get indirect pointer
- 			if(update_empty_block_list(&empty_block_list, indirection_ptr[i], 
- 										1, EMPTY) < 0){
+ 			//Update indirection pointer block to free
+ 			if(update_empty_block_list(&empty_block_list, 
+ 							inode_table[file_entry->inode_index].indirect_ptr, 
+ 								1, EMPTY) < 0){
 	 			perror("update_empty_block_list() errror");
 	 			return -1;
  			}
+ 			//Set all block index saved in indirection pointer list
+ 			for(int i=0; 
+ 				i < sizeof(indirection_ptr)/sizeof(indirection_ptr[0]); 
+ 					i++){
+ 				if(update_empty_block_list(&empty_block_list, indirection_ptr[i], 
+ 										1, EMPTY) < 0){
+	 				perror("update_empty_block_list() errror");
+	 				return -1;
+ 				}
+ 			}
+ 			break;
  		}
  		
  		if(update_empty_block_list(&empty_block_list, 
@@ -738,7 +743,10 @@ int sfs_remove(char *file){
 	inode_table[file_entry->inode_index].size = 0;
 	inode_table[file_entry->inode_index].link_counter = 0;
 	inode_table[file_entry->inode_index].indirect_ptr = -1;
-	memset(inode_table[file_entry->inode_index].direct_ptr, -1, 12); 
+	//memset(inode_table[file_entry->inode_index].direct_ptr, -1, 12); 
+	for(int i=0; i < 12; i++){
+		inode_table[file_entry->inode_index].direct_ptr[i] = -1;
+	}
 
 	if(save_Inode_table(&inode_table) < 0){
 		perror("save_Inode_table() error");
@@ -749,32 +757,3 @@ int sfs_remove(char *file){
 
  	return 1;
 }
-
-/*
-getFirstBlock(block #, block_offeset)
- buffer_read_block(index)
- 	memcpy(buffer + offeset, data, 1024 * added_space)
-	writeBlock(index, buffer )
-
-currentblock = first_block + 1
-currentptr = data + first_length
-for(int i=0; i< #blocks; i++)
-	currentblock_index = getBlockIndex(currentblock)
-	writeblock(currentblock_index, currentptr)
-	currentblock ++
-	currentptr += 1024
-
-fullBLockstoWriteTo = floor((toalLength - #ofbiytesThatSavedInFirstblock)/1024)
-*/
-
-/*int main(){
-	mksfs(1);
-	
-	int fd = sfs_fopen("test_file");
-	printf("%d\n", inode_table[file_descriptor_table[fd].iNode].size );
-	char *buff = calloc(200000, sizeof(char));
-	int wrt = sfs_fwrite(fd, buff, 200000);
-	printf("written: %d\n", wrt);
-	return 1;
-
-}*/

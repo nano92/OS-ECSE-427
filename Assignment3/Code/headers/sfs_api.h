@@ -1,3 +1,9 @@
+/*
+Author: Luis Gallet Zambrano
+Id: 260583750
+Date: 05/12/2016
+*/
+
 #ifndef SFS_API_H
 #define SFS_API_H
 
@@ -10,23 +16,20 @@
 #include <errno.h>
 #include "disk_emu.h"
 
-//change names before submission
-#define SFS_API_FILENAME    	"sfs_api.sfs"
+#define SFS_API_FILENAME    	"SFS_API.sfs"
 #define SFS_API_BLOCK_SIZE  	1024
 #define SFS_API_NUM_BLOCKS  	2048
 #define SFS_MAGIC_NUMBER    	0xACBD0005
 #define SFS_INODE_TABLE_SIZE    20
-#define MAX_INODES 		(int)floor((float)(SFS_INODE_TABLE_SIZE*SFS_API_BLOCK_SIZE) / (float)sizeof(Inode))
-#define SFS_NUM_DIRECT_PTR  	12
 #define SFS_MAX_FILENAME    	21
-//#define SFS_MAX_EXT         	3
 #define SFS_MAX_FDENTRIES   	1024
+#define MAX_INODES 		(int)floor((float)(SFS_INODE_TABLE_SIZE*SFS_API_BLOCK_SIZE) / (float)sizeof(Inode))
 #define EMPTY_BLOCK_LIST_SPACE 	(int)ceil((float)SFS_API_NUM_BLOCKS / (float)SFS_API_BLOCK_SIZE)
 #define FULL 					(char)1
 #define EMPTY 					(char)0
 #define ADD						(char)1
 #define REMOVE 					(char)0 
-#define NUM_INDIRECT_PTR		(int)floor((float)(SFS_API_BLOCK_SIZE - sizeof(int))/(float)sizeof(int))
+#define NUM_INDIRECT_PTR (int)floor((float)(SFS_API_BLOCK_SIZE - sizeof(int))/(float)sizeof(int))
 
 typedef struct{
 	int magic_number;
@@ -45,22 +48,9 @@ typedef struct{
 } Inode;
 	
 typedef struct{
-	int size;
-	int allocated_count;
-	char *free_inodes;
-	Inode *inodes;
-} InodeTable; 
-
-typedef struct{
 	char filename[SFS_MAX_FILENAME];
-	//char ext[SFS_MAX_EXT];
 	int inode_index;
 } DirectoryEntry;
-
-typedef struct{
-	int count;
-	DirectoryEntry *entries;
-} Directory;
 
 typedef struct{
 	int iNode;
@@ -69,15 +59,8 @@ typedef struct{
 	int busy;
 } FileDescriptorEntry;
 
-typedef struct{
-	int size;
-	FileDescriptorEntry *entries;
-} FileDescriptorTable;
-
 typedef enum { false , true } bool_t;
 
-//Functions you should implement. 
-//Return -1 for error besides mksfs
 void mksfs(int fresh);
 int sfs_get_next_file_name(char *fname);
 int sfs_get_file_size(char* path);

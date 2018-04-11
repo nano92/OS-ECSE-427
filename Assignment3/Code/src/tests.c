@@ -89,7 +89,6 @@ int test_read_all_files(int *file_id, int *file_size, char **write_buf, int num_
     res = sfs_frseek(file_id[i], 0);
     if(res < 0)
       fprintf(stderr, "Warning: sfs_frseek returned negative. Potential frseek fail?\n");
-    printf("file_id to read, from test: %d\n", file_id[i]);
     res = sfs_fread(file_id[i], buf, file_size[i]);
     //Just a precaution. Don't think it's actually necessary
     buf[file_size[i]] = '\0';
@@ -116,7 +115,6 @@ int test_simple_read_files(int *file_id, int *file_size, char **write_buf, int n
   char buf[512];
   for(int i = 0; i < num_file; i++){
     //Read at the read_ptr location
-    printf("file_id to read, from test: %d\n", file_id[i]);
     res = sfs_fread(file_id[i], buf, strlen(test_str));
     buf[strlen(test_str)] = '\0';
     if(res != strlen(test_str))
@@ -143,7 +141,6 @@ int test_simple_write_files(int *file_id, int *file_size, int *write_ptr, char *
     if(write_ptr[i] > file_size[i])
       file_size[i] = write_ptr[i];
     write_buf[i][file_size[i]] = '\0'; 
-    printf("file_id to write, from test: %d\n", file_id[i]);
     res = sfs_fwrite(file_id[i], test_str, strlen(test_str));
     if(res != strlen(test_str))
       fprintf(stderr, "Warning: sfs_fwrite should return number of bytes written. Potential write fail?\n");
@@ -169,8 +166,6 @@ int test_difficult_read_files(int *file_id, int *file_size, int *write_ptr, char
     write_buf[index][write_ptr[index]] = '\0';
     if(strcmp(buf, write_buf[index] + sizeof(char) * (write_ptr[index] - read_length)) != 0){
         fprintf(stderr, "Error: \nRead failed\n");
-        printf("buf: %s\n",buf);
-        printf("else: %s\n",  write_buf[index] + sizeof(char) * (write_ptr[index] - read_length));
         *err_no += 1;
     }
     write_buf[index][write_ptr[index]] = temp;
